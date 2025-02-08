@@ -10,7 +10,7 @@ BH1750 lightMeter;
 Servo servoHorizontal;  //define the name of the servo rotating right and left
 Servo servoVertical;    //efine the name of the servo rotating upwards and downwards
 
-#include <LowPower.h>   //Use low power between the cycles to save power
+//#include <LowPower.h>   //Use low power between the cycles to save power
 
 //Constants for pins
 const byte interruptButtonPin = 2;  //the pin of button;the corruption is disrupted
@@ -35,7 +35,8 @@ const int initTurnDelay = 100;   //turn delay for the initialization
 const int maxLightTurnDelay = 10000; //If a balance between the sensors could be found, sleep longer so save power
 const bool activateMovement = true; //Activate movement
 const int photoRightCalibration = -30;  //Balance sensors as they are not equally calibrated
-const period_t sleepTime = SLEEP_8S;
+//const period_t sleepTime = SLEEP_8S;
+const uint16_t sleepTime = 10;
 
 //Global variables
 int photoBottomValue = 0;
@@ -53,6 +54,14 @@ int servoVerticalAngle = servoVerticalInitAngle;
 bool doSleep = false;
 
 void setup() {
+  //Init digital IO as low to save power
+  for (int i=0; i<20; i++) {
+    //Set all to output except the analog photoread points
+    if (i != photoBack && i != photoLeft && i != photoFront && i != photoRight) {
+      pinMode(i, OUTPUT);
+    }
+  }
+
   Serial.begin(9600); //define the serial baud rate
   // Initialize the I2C bus (BH1750 library doesn't do this automatically)
   Wire.begin();
@@ -66,9 +75,9 @@ void setup() {
 
   //Set to init position
   servoHorizontal.write(servoHorizontalInitAngle); //return to initial angle
-  delay(100);
+  //delay(100);
   servoVertical.write(servoVerticalInitAngle); //return to initial angle
-  delay(100);
+  //delay(100);
   //pinMode(servoHorizontalPin, OUTPUT);//set the pin of the servo
   //pinMode(servoVerticalPin, OUTPUT);//set the pin of the servo
   servoHorizontal.attach(servoHorizontalPin);  //link the servo to digital port 9
@@ -82,11 +91,21 @@ void setup() {
 
   //LCD init
   lcd.init();          // initialize the LCD
-  lcd.noBacklight();     //set LCD backlight
 
   //Read sensors init
   readPhotoSensors();
   readLightIntensity();
+
+  //**Long sleep
+  //**Setup the watchdog timer begin
+  WDTCSR = (24);  //change enable and WDE - also resets
+  WDTCSR = (33);  //prescalers only - get rid of the WDE and WDCE bit
+  WDTCSR |= (1 << 6); //enable interrupt mode
+
+  //enable sleep
+  SMCR |= (1 << 2); //Power down mode
+  SMCR |= 1;  //Enable sleep
+  //** Setup the watchdog timer end
 }
 
 void loop() {
@@ -106,18 +125,16 @@ void loop() {
   handleSleep();
 
   Serial.println();
-  
-
 }
 
 void readPhotoSensors() {
   photoBottomValue = analogRead(photoBack);
   photoLeftValue = analogRead(photoLeft);
   photoTopValue = analogRead(photoFront);
-  photoRightValue = analogRead(photoRight);
+  photoRightValue = analogRead(photoRight) + photoRightCalibration;
 
   Serial.print("PhotoBack: " + String(photoBottomValue) + ", PhotoFront: " + String(photoTopValue) + ", PhotoLeft: " + 
-    String(photoLeftValue) + ", PhotoRight: " + String(photoRightValue) + "(" + String(photoRightCalibration) + "). ");
+    String(photoLeftValue) + ", PhotoRight: " + String(photoRightValue) + "(" + String(-photoRightCalibration) + "). ");
 }
 
 void readLightIntensity() {
@@ -132,7 +149,6 @@ void reasonAboutNextSteps() {
   //3. Check if movement is allowed
 
   //Horizontal movement
-  int photoRightValueCal = photoRightValue + photoRightCalibration;
   bool doHorizontalMovement = true;
   bool doVerticalMovement = true;
 
@@ -143,15 +159,15 @@ void reasonAboutNextSteps() {
     error = lowLightError;
   }
 
-  if (abs(photoLeftValue - photoRightValueCal) <= error) {
+  if (abs(photoLeftValue - photoRightValue) <= error) {
     Serial.print("Hor light difference within limit: " + String(error) + ". Do nothing. ");
     doHorizontalMovement = false;
   } else {
-    if(photoLeftValue > photoRightValueCal) {
+    if(photoLeftValue > photoRightValue) {
     //left is brighter than right, move left, move to the light
       servoHorizontalAngle -= resolution;
       Serial.print("Servo hor angle: " + String(servoHorizontalAngle) + ", turn left. ");
-    } else if (photoLeftValue < photoRightValueCal) {
+    } else if (photoLeftValue < photoRightValue) {
       servoHorizontalAngle += resolution;
       Serial.print("Servo hor angle: " + String(servoHorizontalAngle) + ", turn right. ");
     }
@@ -167,7 +183,6 @@ void reasonAboutNextSteps() {
       Serial.print("servo horizontal angle = 180, do nothing. ");
     } else {
       doHorizontalMovement = true;
-      servoHorizontal.write(servoHorizontalAngle);
       delay(m_speed);
     } 
   }
@@ -197,7 +212,6 @@ void reasonAboutNextSteps() {
       Serial.print("servo vertical angle = 140, do nothing. ");
     } else {
       doVerticalMovement = true;
-      servoVertical.write(servoVerticalAngle);
       delay(m_speed);
     }
   }
@@ -211,10 +225,22 @@ void reasonAboutNextSteps() {
   }
 }
 
+//Attach controllers and set the control positons
 void controlActuators() {
-
+  if (servoHorizontal.attached()==false) {
+    servoHorizontal.attach(servoHorizontalPin);  //link the servo to digital port 9
+  }
+  if (servoVertical.attached()==false) {
+    servoVertical.attach(servoVerticalPin);  //link the servo to digital port 10*/
+  }
+  
+  servoHorizontal.write(servoHorizontalAngle); //return to initial angle
+  delay(m_speed);
+  servoVertical.write(servoVerticalAngle); //return to initial angle
+  delay(m_speed);
 }
 
+//React on button. Put no logic here as it may freeze the system
 void controlLcd() {
   if (!digitalRead(interruptButtonPin)) {
     if (activateLcd == 0) {
@@ -231,20 +257,21 @@ void controlLcd() {
 
 void showLcdValues() {
   if (activateLcd==1) {
+    lcd.on();
     lcd.backlight();
 
     char str1[5];
-    char str2[3];
-    char str3[3];
-    char str4[3];
-    char str5[3];
+    char str2[4];
+    char str3[4];
+    char str4[4];
+    char str5[4];
 
     dtostrf(lightSensorValue, -5, 0, str1); //Format the light value data as a string, left-aligned
     
-    dtostrf(photoBottomValue, -3, 0, str2);
-    dtostrf(photoTopValue, -3, 0, str3);
-    dtostrf(photoLeftValue, -3, 0, str4);
-    dtostrf(photoRightValue, -3, 0, str5);
+    dtostrf(photoBottomValue, -4, 0, str2);
+    dtostrf(photoTopValue, -4, 0, str3);
+    dtostrf(photoLeftValue, -4, 0, str4);
+    dtostrf(photoRightValue, -4, 0, str5);
     //LCD1602 display
     //display the value of the light intensity
     lcd.setCursor(0, 0);
@@ -258,22 +285,61 @@ void showLcdValues() {
     lcd.print("L:");
     lcd.setCursor(2, 1);
     lcd.print(str4);
-    lcd.setCursor(6, 1);
-    lcd.print("R:");
     lcd.setCursor(8, 1);
+    lcd.print("R:");
+    lcd.setCursor(10, 1);
     lcd.print(str5);
 
   } else {
     lcd.noBacklight();
+    lcd.off();
   }
 }
 
 void handleSleep() {
   if (doSleep==1) {
     Serial.print("Sleep " + String(sleepTime));
-    LowPower.powerDown(sleepTime, ADC_OFF, BOD_OFF);
+
+    //Detach servo
+    servoHorizontal.detach();
+    servoVertical.detach();
+
+    longSleep(sleepTime);
   } else {
+    //Enable ADC again 
+    ADCSRA |= (1 << 7);
+
+    //Use turn delay
     Serial.print("delay " + String(turnDelay));
     delay(turnDelay);
   }
 }
+
+/**
+* Sleep with power down for a number of seconds, handling sleep times > 8s
+*
+**/
+void longSleep(uint16_t sleepInSeconds) {
+    for (int i=0;i<1;i++) {
+      //Disable ADC with ~
+      ADCSRA &= ~(1 << 7);
+      // BOD disable
+      MCUCR |= (3 << 5);
+      MCUCR = (MCUCR & ~(1 << 5)) | (1 << 6);  //then set the BODS bit and clear BODSE bit at the same time
+      __asm__ __volatile__("sleep");
+    }
+      
+  //if ( sleepInSeconds & 0x01 ) LowPower.powerDown(SLEEP_1S, ADC_OFF, BOD_OFF);
+  //if ( sleepInSeconds & 0x02 ) LowPower.powerDown(SLEEP_2S, ADC_OFF, BOD_OFF);
+  //if ( sleepInSeconds & 0x04 ) LowPower.powerDown(SLEEP_4S, ADC_OFF, BOD_OFF);
+
+  //while ( sleepInSeconds & 0xFFF8 ) {
+  //  sleepInSeconds = sleepInSeconds - 8;
+  //  LowPower.powerDown(SLEEP_8S, ADC_OFF, BOD_OFF);
+  //}
+}
+
+//Call watchdog interrupt
+ISR(WDT_vect) {
+
+} // watchdog interrupt
