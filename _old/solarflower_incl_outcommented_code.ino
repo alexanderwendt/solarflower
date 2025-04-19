@@ -1,10 +1,16 @@
-/**
-* Solar Flower
-*
-* Move towards the strongest light source and load the battery. The setup is optimized for minimum power consumption
-*
-* Author: Alexander Wendt
-*/
+//Drivers
+//#include <Wire.h>
+//#include <LiquidCrystal_I2C.h>  //Use panel
+//LiquidCrystal_I2C lcd(0x27, 16, 2);   //Panel
+
+//#include <BH1750.h>     //Light intensity meter
+//#include <Wire.h>
+//BH1750 lightMeter(0x23);
+
+//#include <Servo.h>
+//Servo servoHorizontal;  //define the name of the servo rotating right and left
+//Servo servoVertical;    //efine the name of the servo rotating upwards and downwards
+
 #include <LowPower.h>   //Use low power between the cycles to save power
 
 //--- Constants for pins ---//
@@ -35,10 +41,13 @@ const bool activateMovement = true; //Activate movement
 const byte initError = 5;      //Define the error range to prevent vibration
 const byte lowLightError = 60;  //Error to consider if the light is weak, else the system moves around withoout having any light
 const byte afterSleepError = 10; //Directly after sleep, use a higher tolerance value to prevent the system from moving just a little
+//const int minLightSensorValue = 0;  //Min light to actively search for light source
+//const int maxLightTurnDelay = 10000; //If a balance between the sensors could be found, sleep longer so save power
 const int photoRightCalibration = -30;  //Balance sensors as they are not equally calibrated
 const int minPhotoResistorSolarValue = 730; //The min average value of the photoresistors to be able to generate power with the PV
 
 // Power
+//const period_t sleepTime = SLEEP_8S;
 const int initLoopDelay = 200;   //turn delay for the initialization
 const uint16_t shortSleepTime = 10;
 const uint16_t longSleepTime = 60;
@@ -52,16 +61,18 @@ int photoUpValue = 0;
 int photoRightValue = 0;
 int error = initError;
 unsigned int turnDelay = initLoopDelay;
+//bool activateLcd = false;
 bool errorState = false;
+//unsigned int lightSensorValue = 0;   //save the variable of light intensity 
 unsigned int photoResistorAverageValue = 0;
 
 
 // Servos
 // Horizontal movement
 bool doHorizontalMovement = true;
-int servoHorizontalAngle = servoHorizontalInitAngle;
 // Vertical movement
 bool doVerticalMovement = true;
+int servoHorizontalAngle = servoHorizontalInitAngle;
 int servoVerticalAngle = servoVerticalInitAngle;
 
 // Power
@@ -84,8 +95,33 @@ void setup() {
   Serial.begin(9600); //define the serial baud rate
   Serial.println("Start Solar Flower");
 
+  // Initialize the I2C bus (BH1750 library doesn't do this automatically)
+  //Wire.begin();
+  //lightMeter.begin();
+  //lightMeter.begin(BH1750::CONTINUOUS_HIGH_RES_MODE, 0x23);
+  //lightMeter.configure(BH1750::CONTINUOUS_LOW_RES_MODE);
+  
+  //pinMode(interruptButtonPin, INPUT_PULLUP);
+  //attachInterrupt(digitalPinToInterrupt(interruptButtonPin), controlLcd, FALLING); //xternal interrupt touch type is falling edge; adjust_resolution is interrupt service function ISR
+
+  //pinMode(ledLight, OUTPUT);
+  //pinMode(buzzer, OUTPUT);
   pinMode(powerDeactivationPin, OUTPUT);  //Power deactivation pin photoresistors
   pinMode(servoPowerDeactivationPin, OUTPUT); //Servo power deactivation pin
+
+  //Set to init position
+  //servopulse(servoHorizontalPin, servoHorizontalInitAngle, 0, 270);
+  //delay(100);
+  //servoVertical.write(servoVerticalAngle); //return to initial angle
+  //servopulse(servoVerticalPin, servoVerticalInitAngle, 0, 90);
+  //servoHorizontal.write(servoHorizontalInitAngle); //return to initial angle
+  //delay(100);
+  //servoVertical.write(servoVerticalInitAngle); //return to initial angle
+  //delay(100);
+  //pinMode(servoHorizontalPin, OUTPUT);//set the pin of the servo
+  //pinMode(servoVerticalPin, OUTPUT);//set the pin of the servo
+  //servoHorizontal.attach(servoHorizontalPin);  //link the servo to digital port 9
+  //servoVertical.attach(servoVerticalPin);  //link the servo to digital port 10
 
   //Photo sensors
   pinMode(photoDown, INPUT); //set the mode of pin for phot resistors
@@ -93,10 +129,25 @@ void setup() {
   pinMode(photoUp, INPUT);
   pinMode(photoRight, INPUT);
 
+  //LCD init
+  //lcd.init();          // initialize the LCD
+
   //Read sensors init
   readPhotoSensors();
+  //readLightIntensity();
   // Set actuators to init value
   controlActuators();
+
+  //**Long sleep
+  //**Setup the watchdog timer begin
+  //WDTCSR = (24);  //change enable and WDE - also resets
+  //WDTCSR = (33);  //prescalers only - get rid of the WDE and WDCE bit
+  //WDTCSR |= (1 << 6); //enable interrupt mode
+
+  //enable sleep
+  //SMCR |= (1 << 2); //Power down mode
+  //SMCR |= 1;  //Enable sleep
+  //** Setup the watchdog timer end
 
   // Set power on options
   digitalWrite(powerDeactivationPin, LOW); //Write high to activate devices
@@ -110,7 +161,9 @@ void setup() {
 void loop() {
   //Read photo sensors
   readPhotoSensors();
-
+  //Read light intensity of PV
+  //readLightIntensity();
+  // 
   checkErrorState();
   //Reason on how to proceed
   if (activateMovement==true && errorState==0) {
@@ -119,11 +172,12 @@ void loop() {
     controlActuators();
   }
   //Show LCD values
+  //showLcdValues();
   //Delay for activity
   handleSleep();
 
   Serial.println();
-  delay(100); //Let serial printout complete
+  delay(100);
 }
 
 /**
@@ -154,6 +208,14 @@ void readPhotoSensors() {
   Serial.print("PUp: " + String(photoUpValue) + ", PDown: " + String(photoDownValue) + "| PLeft: " + 
     String(photoLeftValue) + ", PRight: " + String(photoRightValue) + " (" + String(-photoRightCalibration) + ")| Average: " + String(photoResistorAverageValue) + "|");
 }
+
+/**
+* Read light sensor value
+*/
+/*void readLightIntensity() {
+  lightSensorValue = lightMeter.readLightLevel();
+  Serial.print("Light: " + String(lightSensorValue) + " lux. ");
+}*/
 
 /**
 * Based on sensor values, reason about the next servo movements left
@@ -234,6 +296,7 @@ void reasonAboutNextSteps() {
   }
 
   //If any change proposal has been done for both horizontal and vertical servo, set the turn delay to init value
+  //Serial.print("Hor move: " + String(doHorizontalMovement) + ", Vert move: " + String(doVerticalMovement) + ". ");
   if (doHorizontalMovement==1 || doVerticalMovement==1) {
     doSleep = false;
   } else {
@@ -247,7 +310,6 @@ void reasonAboutNextSteps() {
 void controlActuators() {
   if (doHorizontalMovement==1 || doVerticalMovement==1) {
     digitalWrite(servoPowerDeactivationPin, LOW);
-    delay(200); //Let system get powered before setting the commands
   } else {
     digitalWrite(servoPowerDeactivationPin, HIGH);
   }
@@ -261,6 +323,62 @@ void controlActuators() {
   }  
 }
 
+//React on button. Put no logic here as it may freeze the system
+/*void controlLcd() {
+  if (!digitalRead(interruptButtonPin)) {
+    if (activateLcd == 0) {
+      activateLcd = true;
+      Serial.println("Set Activate LCD");
+    } else {
+      activateLcd = false;
+      Serial.println("Set Deactivate LCD");
+    }
+  } else {
+    Serial.println("test");
+  }
+}*/
+
+/*void showLcdValues() {
+  if (activateLcd==1) {
+    lcd.on();
+    lcd.backlight();
+
+    char str1[5];
+    char str2[4];
+    char str3[4];
+    char str4[4];
+    char str5[4];
+
+    dtostrf(lightSensorValue, -5, 0, str1); //Format the light value data as a string, left-aligned
+    
+    dtostrf(photoBottomValue, -4, 0, str2);
+    dtostrf(photoTopValue, -4, 0, str3);
+    dtostrf(photoLeftValue, -4, 0, str4);
+    dtostrf(photoRightValue, -4, 0, str5);
+    //LCD1602 display
+    //display the value of the light intensity
+    lcd.setCursor(0, 0);
+    lcd.print("Light:");
+    lcd.setCursor(6, 0);
+    lcd.print(str1);
+    lcd.setCursor(11, 0);
+    lcd.print("lux");
+
+    lcd.setCursor(0, 1);
+    lcd.print("L:");
+    lcd.setCursor(2, 1);
+    lcd.print(str4);
+    lcd.setCursor(8, 1);
+    lcd.print("R:");
+    lcd.setCursor(10, 1);
+    lcd.print(str5);
+
+  } else {
+    lcd.noBacklight();
+    lcd.off();
+  }
+}*/
+
 /**
 * Sleep and deep sleep through power down
 */
@@ -270,10 +388,17 @@ void handleSleep() {
     digitalWrite(powerDeactivationPin, LOW);  //Write to deactivate all devices set by the transistor
     digitalWrite(servoPowerDeactivationPin, HIGH);
 
+    //Detach servo
+    //servoHorizontal.detach();
+    //servoVertical.detach();
+
     longSleepCount = longSleepCount + 1;  //Increment the long sleep count
     delay(500); //Else TX led is on
     longSleep(sleepTime);
   } else {
+    //Enable ADC again 
+    //ADCSRA |= (1 << 7);
+
     //Use turn delay
     Serial.print("delay " + String(turnDelay));
     longSleepCount = 0;   //Longsleep cancelled, set to 0
@@ -285,7 +410,16 @@ void handleSleep() {
 * Sleep with power down for a number of seconds, handling sleep times > 8s
 *
 **/
-void longSleep(uint16_t sleepInSeconds) {   
+void longSleep(uint16_t sleepInSeconds) {
+  /*for (int i=0;i<1;i++) {
+    //Disable ADC with ~
+    ADCSRA &= ~(1 << 7);
+    // BOD disable
+    MCUCR |= (3 << 5);
+    MCUCR = (MCUCR & ~(1 << 5)) | (1 << 6);  //then set the BODS bit and clear BODSE bit at the same time
+    __asm__ __volatile__("sleep");
+  }*/
+      
   if ( sleepInSeconds & 0x01 ) LowPower.powerDown(SLEEP_1S, ADC_OFF, BOD_OFF);
   if ( sleepInSeconds & 0x02 ) LowPower.powerDown(SLEEP_2S, ADC_OFF, BOD_OFF);
   if ( sleepInSeconds & 0x04 ) LowPower.powerDown(SLEEP_4S, ADC_OFF, BOD_OFF);
@@ -331,3 +465,8 @@ void setServoVerticalAngle(int myAngle) { //the function of pluse
     }
   }
 }
+
+//Call watchdog interrupt
+//ISR(WDT_vect) {
+
+//} // watchdog interrupt
