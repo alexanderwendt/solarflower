@@ -18,7 +18,7 @@
 const byte servoHorizontalPin = 9;
 const byte servoVerticalPin = 10;
 const byte powerDeactivationPin = 4;
-const byte servoPowerDeactivationPin = 5;
+const byte servoVerticalPowerDeactivationPin = 5;
 //const byte ledLight = 3;
 //const byte buzzer = 6;
 const int photoDown = A0;
@@ -104,7 +104,7 @@ void setup() {
   //pinMode(ledLight, OUTPUT);
   //pinMode(buzzer, OUTPUT);
   pinMode(powerDeactivationPin, OUTPUT);  //Power deactivation pin photoresistors
-  pinMode(servoPowerDeactivationPin, OUTPUT); //Servo power deactivation pin
+  pinMode(servoVerticalPowerDeactivationPin, OUTPUT); //Servo power deactivation pin
 
   //Set to init position
   //servopulse(servoHorizontalPin, servoHorizontalInitAngle, 0, 270);
@@ -145,8 +145,8 @@ void setup() {
   //SMCR |= (1 << 2); //Power down mode
   //SMCR |= 1;  //Enable sleep
   //** Setup the watchdog timer end
-  digitalWrite(powerDeactivationPin, HIGH); //Write high to activate devices
-  digitalWrite(servoPowerDeactivationPin, HIGH); //Write high to activate devices
+  digitalWrite(powerDeactivationPin, LOW); //Write high to activate devices
+  digitalWrite(servoVerticalPowerDeactivationPin, HIGH); //Write high to activate devices
   delay(1000);
 }
 
@@ -184,6 +184,7 @@ void checkErrorState() {
 * Read all phot resistor values
 */
 void readPhotoSensors() {
+  digitalWrite(powerDeactivationPin, HIGH); //Write high to activate devices
   photoDownValue = analogRead(photoDown);
   photoLeftValue = analogRead(photoLeft);
   photoUpValue = analogRead(photoUp);
@@ -289,6 +290,12 @@ void reasonAboutNextSteps() {
 
 //Attach controllers and set the control positons
 void controlActuators() {
+  if (doHorizontalMovement==1 || doVerticalMovement==1) {
+    digitalWrite(servoVerticalPowerDeactivationPin, LOW);
+  } else {
+    digitalWrite(servoVerticalPowerDeactivationPin, HIGH);
+  }
+
   if (doHorizontalMovement==1) {
     setServoHorizontalAngle(servoHorizontalAngle);
   } 
@@ -358,6 +365,7 @@ void handleSleep() {
   if (doSleep==1) {
     Serial.print("Sleep " + String(sleepTime));
     digitalWrite(powerDeactivationPin, LOW);  //Write to deactivate all devices set by the transistor
+    digitalWrite(servoVerticalPowerDeactivationPin, HIGH);
 
     //Detach servo
     //servoHorizontal.detach();
@@ -366,7 +374,6 @@ void handleSleep() {
     longSleepCount = longSleepCount + 1;  //Increment the long sleep count
     delay(500); //Else TX led is on
     longSleep(sleepTime);
-    digitalWrite(powerDeactivationPin, HIGH); //Write high to activate devices
   } else {
     //Enable ADC again 
     //ADCSRA |= (1 << 7);
