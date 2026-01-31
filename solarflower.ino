@@ -36,10 +36,11 @@ const byte initError = 5;      //Define the error range to prevent vibration
 const byte lowLightError = 60;  //Error to consider if the light is weak, else the system moves around withoout having any light
 const byte afterSleepError = 10; //Directly after sleep, use a higher tolerance value to prevent the system from moving just a little
 const int photoRightCalibration = -30;  //Balance sensors as they are not equally calibrated
+const int photoRightMinCalibration = -20;  //Balance the minimum calibration value, by setting the min value, which the calibration can do
 const int minPhotoResistorSolarValue = 730; //The min average value of the photoresistors to be able to generate power with the PV
 
 // Power
-const int initLoopDelay = 200;   //turn delay for the initialization
+const int initLoopDelay = 100;   //turn delay for the initialization
 const uint16_t shortSleepTime = 10;
 const uint16_t longSleepTime = 60;
 
@@ -147,12 +148,28 @@ void readPhotoSensors() {
   photoDownValue = analogRead(photoDown);
   photoLeftValue = analogRead(photoLeft);
   photoUpValue = analogRead(photoUp);
-  photoRightValue = analogRead(photoRight) + photoRightCalibration;
+  int photoRightValueUncalibrated = analogRead(photoRight);
+  int photoRightCalibrationCalculated = photoRightCalibration;
+  //For higher values, the calibration value does not apply, reduce
+  //float photoRightCalibrationCalculated2 = ();
+  //Serial.print("cal: " + String(photoRightCalibrationCalculated2) + ";t:" + String(photoRightValueUncalibrated));
+  
+  float minCalibrationValue = 950.;
+  float maxCalibrationValue = 1023.;
+  if (photoRightValueUncalibrated<minCalibrationValue) {
+    photoRightValue = photoRightValueUncalibrated + photoRightCalibration;
+  } else if (photoRightValueUncalibrated>maxCalibrationValue) {
+    photoRightCalibrationCalculated = photoRightMinCalibration;
+    photoRightValue = photoRightValueUncalibrated + photoRightCalibration;
+  } else {
+    photoRightCalibrationCalculated = (int)((photoRightCalibration-photoRightMinCalibration)*((maxCalibrationValue-(float)photoRightValueUncalibrated)/(maxCalibrationValue-minCalibrationValue)));
+    photoRightValue = photoRightValueUncalibrated + photoRightCalibrationCalculated + photoRightMinCalibration;
+  }
 
   photoResistorAverageValue = (int)(photoDownValue + photoLeftValue + photoUpValue + photoRightValue)/4;
 
   Serial.print("PUp: " + String(photoUpValue) + ", PDown: " + String(photoDownValue) + "| PLeft: " + 
-    String(photoLeftValue) + ", PRight: " + String(photoRightValue) + " (" + String(-photoRightCalibration) + ")| Average: " + String(photoResistorAverageValue) + "|");
+    String(photoLeftValue) + ", PRight: " + String(photoRightValue) + " (" + String(photoRightCalibrationCalculated) + ")| Average: " + String(photoResistorAverageValue) + "|");
 }
 
 /**
@@ -169,7 +186,12 @@ void reasonAboutNextSteps() {
     
     sleepTime = shortSleepTime;
   } else {
-    error = lowLightError;
+    if (longSleepCount>=1) {  //If previously woke up from sleep, set a larger error as buffer to prevent unnecessary movements
+      error = lowLightError;
+    } else {
+      error = initError;
+    }
+
     sleepTime = longSleepTime;
   }
 
