@@ -68,9 +68,10 @@ The core logic for the solar tracker is contained within `solarflower.ino`. This
 
 ## Measurements
 While moving, the consumption is 80-180mA with 6.3V, i.e. 0.5-1.2W.
+
 If active and not moving, the consumption is 78mA, i.e. 0.5W
-Standby power consumption: 0.06mA, i.e. 0.4mW
-This measurement of 0.3W for standby power consumption is a critical achievement for this project, especially considering its goal of extreme power saving for a small solar panel application. 
+
+Standby power consumption: 0.06mA, i.e. 0.4mW.
 
 For context, a typical Arduino Nano can consume around 25 mA (approximately 0.125W at 5V) in 
 normal operation and about 7.5 mA (0.0375W at 5V) in standby mode without specific power-saving 
@@ -86,7 +87,7 @@ demonstrated in deep sleep tutorials (e.g., Low Power Arduino! Deep Sleep Tutori
 
 
 ## Outlook
-Future improvements could focus on further refining power consumption, integrating advanced tracking algorithms for cloudy conditions, or exploring alternative energy storage solutions.
+TBD
 
 
 ## Related Work
