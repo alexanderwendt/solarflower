@@ -100,7 +100,7 @@ public:
 
   void activateSensors() {
     digitalWrite(_sensorPin, HIGH);
-    delay(200); // Stabilization delay from original readPhotoSensors
+    delay(400); // Stabilization delay from original readPhotoSensors
   }
 
   void deactivateSensors() {
