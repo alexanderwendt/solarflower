@@ -209,6 +209,7 @@ public:
     int right;
     int average;
     float variance;
+    long vcc_mV;
   };
 
   LightSensorArray() {}
@@ -269,6 +270,8 @@ public:
     }
     _readings.variance = varSum / Config::measurementsPerCycle;
 
+    _readings.vcc_mV = readVcc_mV();
+
     log();
     return _readings;
   }
@@ -299,7 +302,8 @@ public:
                " L:"          + String(_readings.left)  +
                " R:"          + String(_readings.right) +
                " avg:"        + String(_readings.average) +
-               " var:"        + String(_readings.variance));
+               " var:"        + String(_readings.variance) +
+               " Vcc:"        + String((int)_readings.vcc_mV) + "mV");
   }
 
   const Readings& getValues() {
@@ -308,8 +312,26 @@ public:
 
 private:
   Readings _readings;
-};
 
+  long readVcc_mV() {
+    uint8_t admux_old = ADMUX;
+
+    // For ATmega328P (Nano/Uno)
+    ADMUX = _BV(REFS0) | _BV(MUX3) | _BV(MUX2) | _BV(MUX1); // Select VBG 1.1V, reference = VCC
+
+    delayMicroseconds(200);
+    ADCSRA |= _BV(ADSC);
+    while (ADCSRA & _BV(ADSC)) {
+      // Wait for conversion
+    }
+    uint16_t adc = ADC;
+
+    ADMUX = admux_old;
+
+    const long VBG_mV = 1100;  // Adjust if you calibrate it
+    return (VBG_mV * 1023L) / (adc ? adc : 1);
+  }
+};
 
 //--- Global Objects ---//
 PowerManager powerManager(Config::powerDeactivationPin, Config::servoPowerDeactivationPin);
