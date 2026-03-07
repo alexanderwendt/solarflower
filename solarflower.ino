@@ -37,6 +37,8 @@ namespace Config {
   const int photoRightCalibration = -30;  //Balance sensors as they are not equally calibrated
   const int photoRightMinCalibration = -20;  //Balance the minimum calibration value, by setting the min value, which the calibration can do
   const int minPhotoResistorSolarValue = 730; //The min average value of the photoresistors to be able to generate power with the PV
+  const byte measurementsPerCycle = 3;      //Number of measurements to average
+  const int measurementInterval = 100;      //Interval between measurements in ms
 
   // Power
   const int initLoopDelay = 100;   //turn delay for the initialization
@@ -206,6 +208,7 @@ public:
     int up;
     int right;
     int average;
+    float variance;
   };
 
   LightSensorArray() {}
@@ -220,14 +223,51 @@ public:
   const Readings& read(PowerManager& pm) {
     pm.activateSensors();
 
-    _readings.down = analogRead(Config::photoDown);
-    _readings.left = analogRead(Config::photoLeft);
-    _readings.up = analogRead(Config::photoUp);
-    int rawRight = analogRead(Config::photoRight);
+    long sumDown = 0;
+    long sumLeft = 0;
+    long sumUp = 0;
+    long sumRight = 0;
+    int iterAverages[Config::measurementsPerCycle];
 
-    _readings.right = calibrateRightSensor(rawRight);
+    for (byte i = 0; i < Config::measurementsPerCycle; i++) {
+      int d = analogRead(Config::photoDown);
+      int l = analogRead(Config::photoLeft);
+      int u = analogRead(Config::photoUp);
+      int rawR = analogRead(Config::photoRight);
+      int r = calibrateRightSensor(rawR);
+
+      sumDown += d;
+      sumLeft += l;
+      sumUp += u;
+      sumRight += r;
+
+      iterAverages[i] = (d + l + u + r) / 4;
+
+      if (i < (Config::measurementsPerCycle - 1)) {
+        delay(Config::measurementInterval);
+      }
+    }
+
+    _readings.down = (int)(sumDown / Config::measurementsPerCycle);
+    _readings.left = (int)(sumLeft / Config::measurementsPerCycle);
+    _readings.up = (int)(sumUp / Config::measurementsPerCycle);
+    _readings.right = (int)(sumRight / Config::measurementsPerCycle);
 
     _readings.average = (_readings.down + _readings.left + _readings.up + _readings.right) / 4;
+
+    // Calculate variance of the cycle averages
+    float meanIter = 0;
+    for (byte i = 0; i < Config::measurementsPerCycle; i++) {
+      meanIter += (float)iterAverages[i];
+    }
+    meanIter /= Config::measurementsPerCycle;
+
+    float varSum = 0;
+    for (byte i = 0; i < Config::measurementsPerCycle; i++) {
+      float diff = (float)iterAverages[i] - meanIter;
+      varSum += diff * diff;
+    }
+    _readings.variance = varSum / Config::measurementsPerCycle;
 
     log();
     return _readings;
@@ -258,7 +298,8 @@ public:
                " D:"          + String(_readings.down)  +
                " L:"          + String(_readings.left)  +
                " R:"          + String(_readings.right) +
-               " avg:"        + String(_readings.average));
+               " avg:"        + String(_readings.average) +
+               " var:"        + String(_readings.variance));
   }
 
   const Readings& getValues() {
