@@ -34,6 +34,8 @@ The software, written in Arduino C (C++), resides in `solarflower.ino` and focus
 - **Calibration & Error Handling:** Incorporates calibration for photoresistor readings and checking for potential error states, such as disconnected sensors, to ensure reliable operation.
 - **Serial Communication:** Provides serial output for debugging and monitoring sensor values and servo positions.
 
+**Coding Style:** All code follows the conventions defined in [STYLE.md](STYLE.md).
+
 **Key Software Features:**
 - **`setup()` function:** Initializes serial communication, sets up pin modes for sensors and actuators, reads initial sensor values, and sets actuators to initial positions.
 - **`loop()` function:** The main execution loop, which repeatedly reads sensors, checks for error states, reasons about movement, controls actuators, and manages sleep states.

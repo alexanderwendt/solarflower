@@ -86,8 +86,16 @@ target reducing this to even lower levels, potentially reaching microampere rang
 demonstrated in deep sleep tutorials (e.g., Low Power Arduino! Deep Sleep Tutorial).
 
 
-## Outlook
-TBD
+## Outlook and Improvements
+### Multiple measurements
+The solar flower measures resistance on the photoresistors and moves. During the measurements and movements of the servos,
+the voltage varies, which influences the measurements. To get more accurate measurements and to prevent unnecessary
+movements of the servos, do the following:
+- each measurement shall be executed 3 times with 100ms interval (static int variable) and the average of the 
+measurements is used
+- We measure top, bottom, right and left sensors and calculate the average of them. Of the three measured averages, 
+the variance shall be calculated and stored. It shall also be added to the log. Probably, the method log() has to be
+modified.
 
 
 ## Related Work
