@@ -7,6 +7,7 @@
 */
 #include <LowPower.h>   //Use low power between the cycles to save power
 #include <Servo.h>
+#include <math.h>
 
 namespace Config {
   //--- Constants for pins ---//
@@ -42,6 +43,7 @@ namespace Config {
   const int initLoopDelay = 100;   //turn delay for the initialization
   const uint16_t shortSleepTime = 10;
   const uint16_t longSleepTime = 60;
+  //const uint16_t longSleepTime = 5;
 }
 
 // ---------------------------------------------------------------------------
@@ -200,11 +202,16 @@ public:
     pm.activateSensors();
 
     _readings.down = analogRead(Config::photoDown);
-    _readings.left = analogRead(Config::photoLeft);
-    _readings.up = analogRead(Config::photoUp);
-    int rawRight = analogRead(Config::photoRight);
+    //_readings.left = analogRead(Config::photoLeft);
+    int rawLeft = analogRead(Config::photoLeft);
 
-    _readings.right = calibrateRightSensor(rawRight);
+    _readings.up = analogRead(Config::photoUp);
+  
+    _readings.right = analogRead(Config::photoRight);  
+    
+    _readings.left = adjustLeftSensor(rawLeft);
+    //_readings.left = rawLeft;
+    
 
     _readings.average = (_readings.down + _readings.left + _readings.up + _readings.right) / 4;
 
@@ -212,7 +219,31 @@ public:
     return _readings;
   }
 
-  int calibrateRightSensor(int rawValue) {
+  int adjustLeftSensor(int rawValue) {
+    float minCalibrationValue = 0.0;
+    float maxCalibrationValue = 1023.0;
+    
+    float a = 0.01;
+    float b = 0.045;
+    float c = 0.185;
+    float tao1 = 90;
+    float tao2 = 650;
+
+    float calibrationValue = a + b * exp(-(float)rawValue/tao1) + c * exp(-(float)rawValue/tao2);
+    float newSensorValue = (float)rawValue * (1 + calibrationValue);
+
+    float correctedSensorValue = newSensorValue;
+    if (newSensorValue > maxCalibrationValue) {
+      correctedSensorValue = maxCalibrationValue;
+    }
+    if (newSensorValue < minCalibrationValue) {
+      correctedSensorValue = minCalibrationValue;
+    }
+
+    return (int)correctedSensorValue;
+  }
+
+  /*int calibrateRightSensor(int rawValue) {
       // Extracted calibration logic
       float minCalibrationValue = 950.0;
       float maxCalibrationValue = 1023.0;
@@ -230,7 +261,7 @@ public:
         calibratedValue = rawValue + calcCalibration + Config::photoRightMinCalibration;
       }
       return calibratedValue;
-  }
+  }*/
 
   void log() {
     logger.add("[SENSORS] U:" + String(_readings.up)    +
@@ -250,7 +281,7 @@ private:
 //--- Global Objects ---//
 PowerManager powerManager(Config::powerDeactivationPin, Config::servoPowerDeactivationPin);
 SolarServo servoHorizontal(Config::servoHorizontalPin, 0, 270);
-SolarServo servoVertical(Config::servoVerticalPin, 0, 90); // Logic says limit is 90 in loop, though var name says 180 range
+SolarServo servoVertical(Config::servoVerticalPin, 0, 90);
 LightSensorArray sensors;
 
 // State variables
@@ -294,8 +325,12 @@ void updateLogic() {
     error     = (longSleepCount >= 1) ? Config::lowLightError : Config::initError;
     sleepTime = Config::longSleepTime;
   }
-  if (longSleepCount >= 2) sleepTime = Config::longSleepTime;
-  else                      sleepTime = Config::shortSleepTime;
+
+  if (longSleepCount >= 2) {
+    sleepTime = Config::longSleepTime;
+  } else {
+    sleepTime = Config::shortSleepTime;
+  }
 
   // ---- Horizontal ----
   bool   moveHorz    = false;
@@ -343,6 +378,19 @@ void updateLogic() {
   }
 }
 
+bool checkErrors() {
+  // Error check
+  const auto& val = sensors.getValues();
+  bool errorStateSensorsNoPower = (val.down == 0 && val.up == 0);
+  if (errorStateSensorsNoPower) {
+    logger.add("[ERROR] sensors U+D=0");
+  }
+
+  
+
+  return errorStateSensorsNoPower;
+}
+
 void loop() {
   logger.clear();
 
@@ -350,11 +398,8 @@ void loop() {
   sensors.read(powerManager);
 
   // Error check
-  const auto& val = sensors.getValues();
-  bool errorState = (val.down == 0 && val.up == 0);
-  if (errorState) {
-    logger.add("[ERROR] sensors U+D=0");
-  }
+  bool errorState = false;
+  errorState = checkErrors();
 
   // Reason & act  →  adds [HORZ] and [VERT] tokens
   if (Config::activateMovement && !errorState) {
