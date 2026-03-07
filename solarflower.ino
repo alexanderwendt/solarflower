@@ -38,6 +38,8 @@ namespace Config {
   const int photoRightCalibration = -30;  //Balance sensors as they are not equally calibrated
   const int photoRightMinCalibration = -20;  //Balance the minimum calibration value, by setting the min value, which the calibration can do
   const int minPhotoResistorSolarValue = 730; //The min average value of the photoresistors to be able to generate power with the PV
+  const byte measurementsPerCycle = 3;      //Number of measurements to average
+  const int measurementInterval = 100;      //Interval between measurements in ms
 
   // Power
   const int initLoopDelay = 100;   //turn delay for the initialization
@@ -53,10 +55,15 @@ namespace Config {
 // ---------------------------------------------------------------------------
 class Logger {
 public:
-  void clear() { _buf[0] = '\0'; _len = 0; }
+  void clear() {
+    _buf[0] = '\0';
+    _len = 0;
+  }
 
   void add(const String& token) {
-    if (_len > 0) append(" | ");
+    if (_len > 0) {
+      append(" | ");
+    }
     append(token.c_str());
   }
 
@@ -70,8 +77,9 @@ private:
   int  _len = 0;
 
   void append(const char* s) {
-    while (*s && _len < (int)sizeof(_buf) - 1)
+    while (*s && _len < (int)sizeof(_buf) - 1) {
       _buf[_len++] = *s++;
+    }
     _buf[_len] = '\0';
   }
 };
@@ -94,7 +102,7 @@ public:
 
   void activateSensors() {
     digitalWrite(_sensorPin, HIGH);
-    delay(200); // Stabilization delay from original readPhotoSensors
+    delay(400); // Stabilization delay from original readPhotoSensors
   }
 
   void deactivateSensors() {
@@ -120,16 +128,25 @@ public:
 
     // Handle splits for long sleep times
     while (seconds >= 8) {
-        LowPower.powerDown(SLEEP_8S, ADC_OFF, BOD_OFF);
-        seconds -= 8;
+      LowPower.powerDown(SLEEP_8S, ADC_OFF, BOD_OFF);
+      seconds -= 8;
     }
-    if (seconds >= 4) { LowPower.powerDown(SLEEP_4S, ADC_OFF, BOD_OFF); seconds -= 4; }
-    if (seconds >= 2) { LowPower.powerDown(SLEEP_2S, ADC_OFF, BOD_OFF); seconds -= 2; }
-    if (seconds >= 1) { LowPower.powerDown(SLEEP_1S, ADC_OFF, BOD_OFF); seconds -= 1; }
+    if (seconds >= 4) {
+      LowPower.powerDown(SLEEP_4S, ADC_OFF, BOD_OFF);
+      seconds -= 4;
+    }
+    if (seconds >= 2) {
+      LowPower.powerDown(SLEEP_2S, ADC_OFF, BOD_OFF);
+      seconds -= 2;
+    }
+    if (seconds >= 1) {
+      LowPower.powerDown(SLEEP_1S, ADC_OFF, BOD_OFF);
+      seconds -= 1;
+    }
   }
 
   void idle(unsigned int ms) {
-      delay(ms);
+    delay(ms);
   }
 
 private:
@@ -163,13 +180,19 @@ public:
       ? map(_angle, 0, 270, 500, 2500)
       : map(_angle, 0, 180, 500, 2500);
 
-    if (!_servo.attached()) attach();
+    if (!_servo.attached()) {
+      attach();
+    }
     _servo.writeMicroseconds(pulsewidth);
     delay(200); // Allow servo time to reach position
   }
 
-  int getAngle() { return _angle; }
-  void setAngleNoMove(int angle) { _angle = angle; }
+  int getAngle() {
+    return _angle;
+  }
+  void setAngleNoMove(int angle) {
+    _angle = angle;
+  }
 
 private:
   Servo _servo;
@@ -187,6 +210,8 @@ public:
     int up;
     int right;
     int average;
+    float variance;
+    long vcc_mV;
   };
 
   LightSensorArray() {}
@@ -201,19 +226,53 @@ public:
   const Readings& read(PowerManager& pm) {
     pm.activateSensors();
 
-    _readings.down = analogRead(Config::photoDown);
-    //_readings.left = analogRead(Config::photoLeft);
-    int rawLeft = analogRead(Config::photoLeft);
+    long sumDown = 0;
+    long sumLeft = 0;
+    long sumUp = 0;
+    long sumRight = 0;
+    int iterAverages[Config::measurementsPerCycle];
 
-    _readings.up = analogRead(Config::photoUp);
-  
-    _readings.right = analogRead(Config::photoRight);  
-    
-    _readings.left = adjustLeftSensor(rawLeft);
-    //_readings.left = rawLeft;
-    
+    for (byte i = 0; i < Config::measurementsPerCycle; i++) {
+      int d = analogRead(Config::photoDown);
+      int l = analogRead(Config::photoLeft);
+      int u = analogRead(Config::photoUp);
+      int rawR = analogRead(Config::photoRight);
+      int r = calibrateRightSensor(rawR);
+
+      sumDown += d;
+      sumLeft += l;
+      sumUp += u;
+      sumRight += r;
+
+      iterAverages[i] = (d + l + u + r) / 4;
+
+      if (i < (Config::measurementsPerCycle - 1)) {
+        delay(Config::measurementInterval);
+      }
+    }
+
+    _readings.down = (int)(sumDown / Config::measurementsPerCycle);
+    _readings.left = (int)(sumLeft / Config::measurementsPerCycle);
+    _readings.up = (int)(sumUp / Config::measurementsPerCycle);
+    _readings.right = (int)(sumRight / Config::measurementsPerCycle);
 
     _readings.average = (_readings.down + _readings.left + _readings.up + _readings.right) / 4;
+
+    // Calculate variance of the cycle averages
+    float meanIter = 0;
+    for (byte i = 0; i < Config::measurementsPerCycle; i++) {
+      meanIter += (float)iterAverages[i];
+    }
+    meanIter /= Config::measurementsPerCycle;
+
+    float varSum = 0;
+    for (byte i = 0; i < Config::measurementsPerCycle; i++) {
+      float diff = (float)iterAverages[i] - meanIter;
+      varSum += diff * diff;
+    }
+    _readings.variance = varSum / Config::measurementsPerCycle;
+
+    _readings.vcc_mV = readVcc_mV();
 
     log();
     return _readings;
@@ -244,23 +303,23 @@ public:
   }
 
   /*int calibrateRightSensor(int rawValue) {
-      // Extracted calibration logic
-      float minCalibrationValue = 950.0;
-      float maxCalibrationValue = 1023.0;
-      int calibratedValue = 0;
-      int calcCalibration = Config::photoRightCalibration;
+    // Extracted calibration logic
+    float minCalibrationValue = 950.0;
+    float maxCalibrationValue = 1023.0;
+    int calibratedValue = 0;
+    int calcCalibration = Config::photoRightCalibration;
 
-      if (rawValue < minCalibrationValue) {
-        calibratedValue = rawValue + Config::photoRightCalibration;
-      } else if (rawValue > maxCalibrationValue) {
-        calibratedValue = rawValue + Config::photoRightMinCalibration;
-        calcCalibration = Config::photoRightMinCalibration; // for logging if needed
-      } else {
-        calcCalibration = (int)((Config::photoRightCalibration - Config::photoRightMinCalibration) *
-                          ((maxCalibrationValue - (float)rawValue) / (maxCalibrationValue - minCalibrationValue)));
-        calibratedValue = rawValue + calcCalibration + Config::photoRightMinCalibration;
-      }
-      return calibratedValue;
+    if (rawValue < minCalibrationValue) {
+      calibratedValue = rawValue + Config::photoRightCalibration;
+    } else if (rawValue > maxCalibrationValue) {
+      calibratedValue = rawValue + Config::photoRightMinCalibration;
+      calcCalibration = Config::photoRightMinCalibration; // for logging if needed
+    } else {
+      calcCalibration = (int)((Config::photoRightCalibration - Config::photoRightMinCalibration) *
+                        ((maxCalibrationValue - (float)rawValue) / (maxCalibrationValue - minCalibrationValue)));
+      calibratedValue = rawValue + calcCalibration + Config::photoRightMinCalibration;
+    }
+    return calibratedValue;
   }*/
 
   void log() {
@@ -268,15 +327,37 @@ public:
                " D:"          + String(_readings.down)  +
                " L:"          + String(_readings.left)  +
                " R:"          + String(_readings.right) +
-               " avg:"        + String(_readings.average));
+               " avg:"        + String(_readings.average) +
+               " var:"        + String(_readings.variance) +
+               " Vcc:"        + String((int)_readings.vcc_mV) + "mV");
   }
 
-  const Readings& getValues() { return _readings; }
+  const Readings& getValues() {
+    return _readings;
+  }
 
 private:
   Readings _readings;
-};
 
+  long readVcc_mV() {
+    uint8_t admux_old = ADMUX;
+
+    // For ATmega328P (Nano/Uno)
+    ADMUX = _BV(REFS0) | _BV(MUX3) | _BV(MUX2) | _BV(MUX1); // Select VBG 1.1V, reference = VCC
+
+    delayMicroseconds(200);
+    ADCSRA |= _BV(ADSC);
+    while (ADCSRA & _BV(ADSC)) {
+      // Wait for conversion
+    }
+    uint16_t adc = ADC;
+
+    ADMUX = admux_old;
+
+    const long VBG_mV = 1100;  // Adjust if you calibrate it
+    return (VBG_mV * 1023L) / (adc ? adc : 1);
+  }
+};
 
 //--- Global Objects ---//
 PowerManager powerManager(Config::powerDeactivationPin, Config::servoPowerDeactivationPin);
@@ -340,12 +421,23 @@ void updateLogic() {
   if (abs(val.left - val.right) <= error) {
     horzMsg = "STEADY";
   } else {
-    if (val.left > val.right) { currentHorz -= Config::resolution; horzMsg = "LEFT";  }
-    else                      { currentHorz += Config::resolution; horzMsg = "RIGHT"; }
+    if (val.left > val.right) {
+      currentHorz -= Config::resolution;
+      horzMsg = "LEFT";
+    } else {
+      currentHorz += Config::resolution;
+      horzMsg = "RIGHT";
+    }
 
-    if      (currentHorz <= 0)   { currentHorz = 0;   horzMsg = "LEFT(LIMIT)";  }
-    else if (currentHorz >= 270) { currentHorz = 270; horzMsg = "RIGHT(LIMIT)"; }
-    else                         { moveHorz = true; }
+    if (currentHorz <= 0) {
+      currentHorz = 0;
+      horzMsg = "LEFT(LIMIT)";
+    } else if (currentHorz >= 270) {
+      currentHorz = 270;
+      horzMsg = "RIGHT(LIMIT)";
+    } else {
+      moveHorz = true;
+    }
   }
   logger.add("[HORZ] " + String(currentHorz) + "deg " + horzMsg);
 
@@ -357,12 +449,23 @@ void updateLogic() {
   if (abs(val.down - val.up) <= error) {
     vertMsg = "STEADY";
   } else {
-    if (val.down < val.up) { currentVert -= Config::resolution; vertMsg = "UP";   }
-    else                   { currentVert += Config::resolution; vertMsg = "DOWN"; }
+    if (val.down < val.up) {
+      currentVert -= Config::resolution;
+      vertMsg = "UP";
+    } else {
+      currentVert += Config::resolution;
+      vertMsg = "DOWN";
+    }
 
-    if      (currentVert <= 0)  { currentVert = 0;  vertMsg = "UP(LIMIT)";   }
-    else if (currentVert >= 90) { currentVert = 90; vertMsg = "DOWN(LIMIT)"; }
-    else                        { moveVert = true; }
+    if (currentVert <= 0) {
+      currentVert = 0;
+      vertMsg = "UP(LIMIT)";
+    } else if (currentVert >= 90) {
+      currentVert = 90;
+      vertMsg = "DOWN(LIMIT)";
+    } else {
+      moveVert = true;
+    }
   }
   logger.add("[VERT] " + String(currentVert) + "deg " + vertMsg);
 
@@ -370,8 +473,12 @@ void updateLogic() {
   if (moveHorz || moveVert) {
     doSleep = false;
     powerManager.activateServos();
-    if (moveHorz) servoHorizontal.write(currentHorz);
-    if (moveVert) servoVertical.write(currentVert);
+    if (moveHorz) {
+      servoHorizontal.write(currentHorz);
+    }
+    if (moveVert) {
+      servoVertical.write(currentVert);
+    }
   } else {
     doSleep = true;
     powerManager.deactivateServos();
@@ -420,4 +527,3 @@ void loop() {
     powerManager.idle(Config::initLoopDelay);
   }
 }
-
