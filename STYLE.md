@@ -20,10 +20,11 @@ This document defines the coding style for the Solar Flower project to ensure co
     }
   }
   ```
-- **Single-line Statements:** *Never* use short `if` statements, i.e. `if` statements that can be written on a single 
-- line if it improves readability.
+- **Single-line Statements:** *Never* use short `if` statements, i.e. `if` statements that can be written on a single line even if it improves readability.
   ```cpp
-  if (moveHorz) servoHorizontal.write(currentHorz);
+  if (moveHorz) {
+    servoHorizontal.write(currentHorz);
+  }
   ```
 
 ## Naming Conventions

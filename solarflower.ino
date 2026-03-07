@@ -51,10 +51,15 @@ namespace Config {
 // ---------------------------------------------------------------------------
 class Logger {
 public:
-  void clear() { _buf[0] = '\0'; _len = 0; }
+  void clear() {
+    _buf[0] = '\0';
+    _len = 0;
+  }
 
   void add(const String& token) {
-    if (_len > 0) append(" | ");
+    if (_len > 0) {
+      append(" | ");
+    }
     append(token.c_str());
   }
 
@@ -68,8 +73,9 @@ private:
   int  _len = 0;
 
   void append(const char* s) {
-    while (*s && _len < (int)sizeof(_buf) - 1)
+    while (*s && _len < (int)sizeof(_buf) - 1) {
       _buf[_len++] = *s++;
+    }
     _buf[_len] = '\0';
   }
 };
@@ -118,16 +124,25 @@ public:
 
     // Handle splits for long sleep times
     while (seconds >= 8) {
-        LowPower.powerDown(SLEEP_8S, ADC_OFF, BOD_OFF);
-        seconds -= 8;
+      LowPower.powerDown(SLEEP_8S, ADC_OFF, BOD_OFF);
+      seconds -= 8;
     }
-    if (seconds >= 4) { LowPower.powerDown(SLEEP_4S, ADC_OFF, BOD_OFF); seconds -= 4; }
-    if (seconds >= 2) { LowPower.powerDown(SLEEP_2S, ADC_OFF, BOD_OFF); seconds -= 2; }
-    if (seconds >= 1) { LowPower.powerDown(SLEEP_1S, ADC_OFF, BOD_OFF); seconds -= 1; }
+    if (seconds >= 4) {
+      LowPower.powerDown(SLEEP_4S, ADC_OFF, BOD_OFF);
+      seconds -= 4;
+    }
+    if (seconds >= 2) {
+      LowPower.powerDown(SLEEP_2S, ADC_OFF, BOD_OFF);
+      seconds -= 2;
+    }
+    if (seconds >= 1) {
+      LowPower.powerDown(SLEEP_1S, ADC_OFF, BOD_OFF);
+      seconds -= 1;
+    }
   }
 
   void idle(unsigned int ms) {
-      delay(ms);
+    delay(ms);
   }
 
 private:
@@ -161,13 +176,19 @@ public:
       ? map(_angle, 0, 270, 500, 2500)
       : map(_angle, 0, 180, 500, 2500);
 
-    if (!_servo.attached()) attach();
+    if (!_servo.attached()) {
+      attach();
+    }
     _servo.writeMicroseconds(pulsewidth);
     delay(200); // Allow servo time to reach position
   }
 
-  int getAngle() { return _angle; }
-  void setAngleNoMove(int angle) { _angle = angle; }
+  int getAngle() {
+    return _angle;
+  }
+  void setAngleNoMove(int angle) {
+    _angle = angle;
+  }
 
 private:
   Servo _servo;
@@ -213,23 +234,23 @@ public:
   }
 
   int calibrateRightSensor(int rawValue) {
-      // Extracted calibration logic
-      float minCalibrationValue = 950.0;
-      float maxCalibrationValue = 1023.0;
-      int calibratedValue = 0;
-      int calcCalibration = Config::photoRightCalibration;
+    // Extracted calibration logic
+    float minCalibrationValue = 950.0;
+    float maxCalibrationValue = 1023.0;
+    int calibratedValue = 0;
+    int calcCalibration = Config::photoRightCalibration;
 
-      if (rawValue < minCalibrationValue) {
-        calibratedValue = rawValue + Config::photoRightCalibration;
-      } else if (rawValue > maxCalibrationValue) {
-        calibratedValue = rawValue + Config::photoRightMinCalibration;
-        calcCalibration = Config::photoRightMinCalibration; // for logging if needed
-      } else {
-        calcCalibration = (int)((Config::photoRightCalibration - Config::photoRightMinCalibration) *
-                          ((maxCalibrationValue - (float)rawValue) / (maxCalibrationValue - minCalibrationValue)));
-        calibratedValue = rawValue + calcCalibration + Config::photoRightMinCalibration;
-      }
-      return calibratedValue;
+    if (rawValue < minCalibrationValue) {
+      calibratedValue = rawValue + Config::photoRightCalibration;
+    } else if (rawValue > maxCalibrationValue) {
+      calibratedValue = rawValue + Config::photoRightMinCalibration;
+      calcCalibration = Config::photoRightMinCalibration; // for logging if needed
+    } else {
+      calcCalibration = (int)((Config::photoRightCalibration - Config::photoRightMinCalibration) *
+                        ((maxCalibrationValue - (float)rawValue) / (maxCalibrationValue - minCalibrationValue)));
+      calibratedValue = rawValue + calcCalibration + Config::photoRightMinCalibration;
+    }
+    return calibratedValue;
   }
 
   void log() {
@@ -240,7 +261,9 @@ public:
                " avg:"        + String(_readings.average));
   }
 
-  const Readings& getValues() { return _readings; }
+  const Readings& getValues() {
+    return _readings;
+  }
 
 private:
   Readings _readings;
@@ -294,8 +317,12 @@ void updateLogic() {
     error     = (longSleepCount >= 1) ? Config::lowLightError : Config::initError;
     sleepTime = Config::longSleepTime;
   }
-  if (longSleepCount >= 2) sleepTime = Config::longSleepTime;
-  else                      sleepTime = Config::shortSleepTime;
+
+  if (longSleepCount >= 2) {
+    sleepTime = Config::longSleepTime;
+  } else {
+    sleepTime = Config::shortSleepTime;
+  }
 
   // ---- Horizontal ----
   bool   moveHorz    = false;
@@ -305,12 +332,23 @@ void updateLogic() {
   if (abs(val.left - val.right) <= error) {
     horzMsg = "STEADY";
   } else {
-    if (val.left > val.right) { currentHorz -= Config::resolution; horzMsg = "LEFT";  }
-    else                      { currentHorz += Config::resolution; horzMsg = "RIGHT"; }
+    if (val.left > val.right) {
+      currentHorz -= Config::resolution;
+      horzMsg = "LEFT";
+    } else {
+      currentHorz += Config::resolution;
+      horzMsg = "RIGHT";
+    }
 
-    if      (currentHorz <= 0)   { currentHorz = 0;   horzMsg = "LEFT(LIMIT)";  }
-    else if (currentHorz >= 270) { currentHorz = 270; horzMsg = "RIGHT(LIMIT)"; }
-    else                         { moveHorz = true; }
+    if (currentHorz <= 0) {
+      currentHorz = 0;
+      horzMsg = "LEFT(LIMIT)";
+    } else if (currentHorz >= 270) {
+      currentHorz = 270;
+      horzMsg = "RIGHT(LIMIT)";
+    } else {
+      moveHorz = true;
+    }
   }
   logger.add("[HORZ] " + String(currentHorz) + "deg " + horzMsg);
 
@@ -322,12 +360,23 @@ void updateLogic() {
   if (abs(val.down - val.up) <= error) {
     vertMsg = "STEADY";
   } else {
-    if (val.down < val.up) { currentVert -= Config::resolution; vertMsg = "UP";   }
-    else                   { currentVert += Config::resolution; vertMsg = "DOWN"; }
+    if (val.down < val.up) {
+      currentVert -= Config::resolution;
+      vertMsg = "UP";
+    } else {
+      currentVert += Config::resolution;
+      vertMsg = "DOWN";
+    }
 
-    if      (currentVert <= 0)  { currentVert = 0;  vertMsg = "UP(LIMIT)";   }
-    else if (currentVert >= 90) { currentVert = 90; vertMsg = "DOWN(LIMIT)"; }
-    else                        { moveVert = true; }
+    if (currentVert <= 0) {
+      currentVert = 0;
+      vertMsg = "UP(LIMIT)";
+    } else if (currentVert >= 90) {
+      currentVert = 90;
+      vertMsg = "DOWN(LIMIT)";
+    } else {
+      moveVert = true;
+    }
   }
   logger.add("[VERT] " + String(currentVert) + "deg " + vertMsg);
 
@@ -335,8 +384,12 @@ void updateLogic() {
   if (moveHorz || moveVert) {
     doSleep = false;
     powerManager.activateServos();
-    if (moveHorz) servoHorizontal.write(currentHorz);
-    if (moveVert) servoVertical.write(currentVert);
+    if (moveHorz) {
+      servoHorizontal.write(currentHorz);
+    }
+    if (moveVert) {
+      servoVertical.write(currentVert);
+    }
   } else {
     doSleep = true;
     powerManager.deactivateServos();
@@ -375,4 +428,3 @@ void loop() {
     powerManager.idle(Config::initLoopDelay);
   }
 }
-
