@@ -7,6 +7,7 @@
 */
 #include <LowPower.h>   //Use low power between the cycles to save power
 #include <Servo.h>
+#include <math.h>
 
 namespace Config {
   //--- Constants for pins ---//
@@ -238,10 +239,11 @@ public:
 
     for (byte i = 0; i < Config::measurementsPerCycle; i++) {
       int d = analogRead(Config::photoDown);
-      int l = analogRead(Config::photoLeft);
+      int rawL = analogRead(Config::photoLeft);
+      int l = adjustLeftSensor(rawL);
       int u = analogRead(Config::photoUp);
       int rawR = analogRead(Config::photoRight);
-      int r = calibrateRightSensor(rawR);
+      int r = rawR;
 
       sumDown += d;
       sumLeft += l;
@@ -282,7 +284,31 @@ public:
     return _readings;
   }
 
-  int calibrateRightSensor(int rawValue) {
+  int adjustLeftSensor(int rawValue) {
+    float minCalibrationValue = 0.0;
+    float maxCalibrationValue = 1023.0;
+
+    float a = 0.01;
+    float b = 0.045;
+    float c = 0.185;
+    float tao1 = 90;
+    float tao2 = 650;
+
+    float calibrationValue = a + b * exp(-(float)rawValue/tao1) + c * exp(-(float)rawValue/tao2);
+    float newSensorValue = (float)rawValue * (1 + calibrationValue);
+
+    float correctedSensorValue = newSensorValue;
+    if (newSensorValue > maxCalibrationValue) {
+      correctedSensorValue = maxCalibrationValue;
+    }
+    if (newSensorValue < minCalibrationValue) {
+      correctedSensorValue = minCalibrationValue;
+    }
+
+    return (int)correctedSensorValue;
+  }
+
+  /*int calibrateRightSensor(int rawValue) {
     // Extracted calibration logic
     float minCalibrationValue = 950.0;
     float maxCalibrationValue = 1023.0;
@@ -300,7 +326,7 @@ public:
       calibratedValue = rawValue + calcCalibration + Config::photoRightMinCalibration;
     }
     return calibratedValue;
-  }
+  }*/
 
   void log() {
     logger.add("[SENSORS] U:" + String(_readings.up)    +
@@ -499,6 +525,19 @@ void updateLogic() {
   }
 }
 
+bool checkErrors() {
+  // Error check
+  const auto& val = sensors.getValues();
+  bool errorStateSensorsNoPower = (val.down == 0 && val.up == 0);
+  if (errorStateSensorsNoPower) {
+    logger.add("[ERROR] sensors U+D=0");
+  }
+
+
+
+  return errorStateSensorsNoPower;
+}
+
 void loop() {
   logger.clear();
 
@@ -507,7 +546,7 @@ void loop() {
 
   // Slow reset check
   int currentVert = servoVertical.getAngle();
-  if (longSleepCount >= Config::maxLongSleepCount && 
+  if (longSleepCount >= Config::maxLongSleepCount &&
       (currentVert == Config::servoVerticalMinAngle || currentVert == Config::servoVerticalMaxAngle)) {
     slowReset = true;
     logger.add("[RESET] Triggered after " + String(longSleepCount) + " sleeps. Pos: H=" + String(servoHorizontal.getAngle()) + "deg, V=" + String(currentVert) + "deg");
@@ -517,7 +556,7 @@ void loop() {
   const auto& val = sensors.getValues();
   bool sensorError = (val.down == 0 && val.up == 0);
   bool lowPowerError = (val.vcc_mV < (long)(Config::minInternalVoltage * 1000));
-  
+
   // Slow reset overrules sensor error but not low power
   bool errorState = (sensorError && !slowReset) || lowPowerError;
 
