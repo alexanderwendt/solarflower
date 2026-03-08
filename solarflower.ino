@@ -234,10 +234,11 @@ public:
 
     for (byte i = 0; i < Config::measurementsPerCycle; i++) {
       int d = analogRead(Config::photoDown);
-      int l = analogRead(Config::photoLeft);
+      int rawL = analogRead(Config::photoLeft);
+      int l = adjustLeftSensor(rawL);
       int u = analogRead(Config::photoUp);
       int rawR = analogRead(Config::photoRight);
-      int r = calibrateRightSensor(rawR);
+      int r = rawR;
 
       sumDown += d;
       sumLeft += l;
