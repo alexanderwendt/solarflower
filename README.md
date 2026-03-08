@@ -64,6 +64,15 @@ The core logic for the solar tracker is contained within `solarflower.ino`. This
 *   **Calibration & Error Handling:** Incorporating calibration for photoresistor readings and checking for potential error states, such as disconnected sensors, to ensure reliable operation.
 *   **Serial Communication:** Providing serial output for debugging and monitoring sensor values and servo positions.
 
+### Feature: Multiple measurements with the Photoresistors
+The solar flower measures resistance on the photoresistors and moves. During the measurements and movements of the servos,
+the voltage varies, which influences the measurements. To get more accurate measurements and to prevent unnecessary
+movements of the servos, do the following:
+- each measurement shall be executed 3 times with 100ms interval (static int variable) and the average of the 
+measurements is used
+- We measure top, bottom, right and left sensors and calculate the average of them. Of the three measured averages, 
+the variance shall be calculated and stored. It shall also be added to the log. Probably, the method log() has to be
+modified.
 
 
 ## Measurements
@@ -87,15 +96,28 @@ demonstrated in deep sleep tutorials (e.g., Low Power Arduino! Deep Sleep Tutori
 
 
 ## Outlook and Improvements
-### Multiple measurements
-The solar flower measures resistance on the photoresistors and moves. During the measurements and movements of the servos,
-the voltage varies, which influences the measurements. To get more accurate measurements and to prevent unnecessary
-movements of the servos, do the following:
-- each measurement shall be executed 3 times with 100ms interval (static int variable) and the average of the 
-measurements is used
-- We measure top, bottom, right and left sensors and calculate the average of them. Of the three measured averages, 
-the variance shall be calculated and stored. It shall also be added to the log. Probably, the method log() has to be
-modified.
+
+### No action if Arduino voltage is too low
+If the internal voltage of the Arduino is too low defined by a variable "minInternalVoltage", the system must be idle,
+as there is no energy left to perform any movements. The system is in an error state. As long as the internal system 
+voltage is below minInternalVoltage, the system only measures this voltage and nothing else with long sleep 
+(variable longSleepTime). The default value for minInternalVoltage = 4.0V. Add the result of the measurement to
+```bool errorState = (val.down == 0 && val.up == 0);```
+
+### Slow Reset after Standby
+In the night or also at daytime, in some setup, the system goes to the max positions. From there, the system never recovers
+and remains in that position forever. Only a hard reset brings the system to its original position. Therefore,
+a function shall be created that brings the system to its start position after 60 times long sleep (varibale longSleepCount).
+The logic is that if a variable "slowreset" is active it overrules the sensors and brings the servos to the init position 
+(variables servoHorizontalInitAngle and servoVerticalInitAngle) in the same incremental steps as normal movement. As
+soon as the init position is reached, deactivate "slowreset" and proceed with normal operation. 
+Example: If longSleepCount=60 and currentHorz=270, then ignore sensors and move the servos to servoHorizontalInitAngle 
+and servoVerticalInitAngle.
+
+
+
+
+
 
 
 ## Related Work
