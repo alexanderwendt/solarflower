@@ -308,26 +308,6 @@ public:
     return (int)correctedSensorValue;
   }
 
-  /*int calibrateRightSensor(int rawValue) {
-    // Extracted calibration logic
-    float minCalibrationValue = 950.0;
-    float maxCalibrationValue = 1023.0;
-    int calibratedValue = 0;
-    int calcCalibration = Config::photoRightCalibration;
-
-    if (rawValue < minCalibrationValue) {
-      calibratedValue = rawValue + Config::photoRightCalibration;
-    } else if (rawValue > maxCalibrationValue) {
-      calibratedValue = rawValue + Config::photoRightMinCalibration;
-      calcCalibration = Config::photoRightMinCalibration; // for logging if needed
-    } else {
-      calcCalibration = (int)((Config::photoRightCalibration - Config::photoRightMinCalibration) *
-                        ((maxCalibrationValue - (float)rawValue) / (maxCalibrationValue - minCalibrationValue)));
-      calibratedValue = rawValue + calcCalibration + Config::photoRightMinCalibration;
-    }
-    return calibratedValue;
-  }*/
-
   void log() {
     logger.add("[SENSORS] U:" + String(_readings.up)    +
                " D:"          + String(_readings.down)  +
@@ -401,8 +381,105 @@ void setup() {
   delay(1000);
 }
 
-void updateLogic() {
+void handleSlowReset(int& currentHorz, int& currentVert, bool& moveHorz, bool& moveVert, String& horzMsg, String& vertMsg) {
+  if (currentHorz != Config::servoHorizontalInitAngle) {
+    if (currentHorz < Config::servoHorizontalInitAngle) {
+      currentHorz += Config::resolution;
+    } else {
+      currentHorz -= Config::resolution;
+    }
+    moveHorz = true;
+    horzMsg = "RESET";
+  } else {
+    horzMsg = "STEADY(INIT)";
+  }
+
+  if (currentVert != Config::servoVerticalInitAngle) {
+    if (currentVert < Config::servoVerticalInitAngle) {
+      currentVert += Config::resolution;
+    } else {
+      currentVert -= Config::resolution;
+    }
+    moveVert = true;
+    vertMsg = "RESET";
+  } else {
+    vertMsg = "STEADY(INIT)";
+  }
+
+  if (!moveHorz && !moveVert) {
+    slowReset = false;
+    logger.add("[RESET] Finished");
+  }
+  sleepTime = Config::shortSleepTime;
+}
+
+void handleNormalMovement(int& currentHorz, int& currentVert, bool& moveHorz, bool& moveVert, String& horzMsg, String& vertMsg) {
   const auto& val = sensors.getValues();
+  int error;
+
+  // Determine error threshold and sleep time
+  if (val.average >= Config::minPhotoResistorSolarValue) {
+    error     = (longSleepCount >= 1) ? Config::afterSleepError : Config::initError;
+    sleepTime = Config::shortSleepTime;
+  } else {
+    error     = (longSleepCount >= 1) ? Config::lowLightError : Config::initError;
+    sleepTime = Config::longSleepTime;
+  }
+
+  if (longSleepCount >= 2) {
+    sleepTime = Config::longSleepTime;
+  } else {
+    sleepTime = Config::shortSleepTime;
+  }
+
+  // ---- Horizontal ----
+  if (abs(val.left - val.right) <= error) {
+    horzMsg = "STEADY";
+  } else {
+    if (val.left > val.right) {
+      currentHorz -= Config::resolution;
+      horzMsg = "LEFT";
+    } else {
+      currentHorz += Config::resolution;
+      horzMsg = "RIGHT";
+    }
+
+    if (currentHorz <= Config::servoHorizontalMinAngle) {
+      currentHorz = Config::servoHorizontalMinAngle;
+      horzMsg = "LEFT(LIMIT)";
+    } else if (currentHorz >= Config::servoHorizontalMaxAngle) {
+      currentHorz = Config::servoHorizontalMaxAngle;
+      horzMsg = "RIGHT(LIMIT)";
+    } else {
+      moveHorz = true;
+    }
+  }
+
+  // ---- Vertical ----
+  if (abs(val.down - val.up) <= error) {
+    vertMsg = "STEADY";
+  } else {
+    if (val.down < val.up) {
+      currentVert -= Config::resolution;
+      vertMsg = "UP";
+    } else {
+      currentVert += Config::resolution;
+      vertMsg = "DOWN";
+    }
+
+    if (currentVert <= Config::servoVerticalMinAngle) {
+      currentVert = Config::servoVerticalMinAngle;
+      vertMsg = "UP(LIMIT)";
+    } else if (currentVert >= Config::servoVerticalMaxAngle) {
+      currentVert = Config::servoVerticalMaxAngle;
+      vertMsg = "DOWN(LIMIT)";
+    } else {
+      moveVert = true;
+    }
+  }
+}
+
+void updateLogic() {
   int currentHorz = servoHorizontal.getAngle();
   int currentVert = servoVertical.getAngle();
   bool moveHorz = false;
@@ -411,99 +488,9 @@ void updateLogic() {
   String vertMsg;
 
   if (slowReset) {
-    // ---- Slow Reset Logic ----
-    if (currentHorz != Config::servoHorizontalInitAngle) {
-      if (currentHorz < Config::servoHorizontalInitAngle) {
-        currentHorz += Config::resolution;
-      } else {
-        currentHorz -= Config::resolution;
-      }
-      moveHorz = true;
-      horzMsg = "RESET";
-    } else {
-      horzMsg = "STEADY(INIT)";
-    }
-
-    if (currentVert != Config::servoVerticalInitAngle) {
-      if (currentVert < Config::servoVerticalInitAngle) {
-        currentVert += Config::resolution;
-      } else {
-        currentVert -= Config::resolution;
-      }
-      moveVert = true;
-      vertMsg = "RESET";
-    } else {
-      vertMsg = "STEADY(INIT)";
-    }
-
-    if (!moveHorz && !moveVert) {
-      slowReset = false;
-      logger.add("[RESET] Finished");
-    }
-    sleepTime = Config::shortSleepTime;
+    handleSlowReset(currentHorz, currentVert, moveHorz, moveVert, horzMsg, vertMsg);
   } else {
-    // ---- Normal Sensor Logic ----
-    int error;
-    // Determine error threshold and sleep time
-    if (val.average >= Config::minPhotoResistorSolarValue) {
-      error     = (longSleepCount >= 1) ? Config::afterSleepError : Config::initError;
-      sleepTime = Config::shortSleepTime;
-    } else {
-      error     = (longSleepCount >= 1) ? Config::lowLightError : Config::initError;
-      sleepTime = Config::longSleepTime;
-    }
-
-    if (longSleepCount >= 2) {
-      sleepTime = Config::longSleepTime;
-    } else {
-      sleepTime = Config::shortSleepTime;
-    }
-
-    // ---- Horizontal ----
-    if (abs(val.left - val.right) <= error) {
-      horzMsg = "STEADY";
-    } else {
-      if (val.left > val.right) {
-        currentHorz -= Config::resolution;
-        horzMsg = "LEFT";
-      } else {
-        currentHorz += Config::resolution;
-        horzMsg = "RIGHT";
-      }
-
-      if (currentHorz <= Config::servoHorizontalMinAngle) {
-        currentHorz = Config::servoHorizontalMinAngle;
-        horzMsg = "LEFT(LIMIT)";
-      } else if (currentHorz >= Config::servoHorizontalMaxAngle) {
-        currentHorz = Config::servoHorizontalMaxAngle;
-        horzMsg = "RIGHT(LIMIT)";
-      } else {
-        moveHorz = true;
-      }
-    }
-
-    // ---- Vertical ----
-    if (abs(val.down - val.up) <= error) {
-      vertMsg = "STEADY";
-    } else {
-      if (val.down < val.up) {
-        currentVert -= Config::resolution;
-        vertMsg = "UP";
-      } else {
-        currentVert += Config::resolution;
-        vertMsg = "DOWN";
-      }
-
-      if (currentVert <= Config::servoVerticalMinAngle) {
-        currentVert = Config::servoVerticalMinAngle;
-        vertMsg = "UP(LIMIT)";
-      } else if (currentVert >= Config::servoVerticalMaxAngle) {
-        currentVert = Config::servoVerticalMaxAngle;
-        vertMsg = "DOWN(LIMIT)";
-      } else {
-        moveVert = true;
-      }
-    }
+    handleNormalMovement(currentHorz, currentVert, moveHorz, moveVert, horzMsg, vertMsg);
   }
 
   logger.add("[HORZ] " + String(currentHorz) + "deg " + horzMsg);
@@ -525,34 +512,17 @@ void updateLogic() {
   }
 }
 
-bool checkErrors() {
-  // Error check
-  const auto& val = sensors.getValues();
-  bool errorStateSensorsNoPower = (val.down == 0 && val.up == 0);
-  if (errorStateSensorsNoPower) {
-    logger.add("[ERROR] sensors U+D=0");
-  }
 
-
-
-  return errorStateSensorsNoPower;
-}
-
-void loop() {
-  logger.clear();
-
-  // Read sensors  →  adds [SENSORS] token
-  sensors.read(powerManager);
-
-  // Slow reset check
+void checkSlowReset() {
   int currentVert = servoVertical.getAngle();
   if (longSleepCount >= Config::maxLongSleepCount &&
       (currentVert == Config::servoVerticalMinAngle || currentVert == Config::servoVerticalMaxAngle)) {
     slowReset = true;
     logger.add("[RESET] Triggered after " + String(longSleepCount) + " sleeps. Pos: H=" + String(servoHorizontal.getAngle()) + "deg, V=" + String(currentVert) + "deg");
   }
+}
 
-  // Error check
+bool checkErrors() {
   const auto& val = sensors.getValues();
   bool sensorError = (val.down == 0 && val.up == 0);
   bool lowPowerError = (val.vcc_mV < (long)(Config::minInternalVoltage * 1000));
@@ -571,16 +541,23 @@ void loop() {
       logger.add("[ERROR] low voltage: " + String((int)val.vcc_mV) + "mV");
     }
   }
+  return errorState;
+}
+
+void loop() {
+  logger.clear();
+
+  // Read sensors  →  adds [SENSORS] token
+  sensors.read(powerManager);
+
+  // Check if the system is in a bad state after 1h and then do reset to normal, but slow
+  checkSlowReset();
+
+  bool errorState = checkErrors();
 
   // Reason & act  →  adds [HORZ] and [VERT] tokens
-  if (Config::activateMovement && (!errorState || slowReset)) {
-    // If low power, we force sleep even if slowReset is true
-    if (lowPowerError) {
-      doSleep = true;
-      sleepTime = Config::longSleepTime;
-    } else {
-      updateLogic();
-    }
+  if (Config::activateMovement && !errorState) {
+    updateLogic();
   }
 
   // Sleep / idle  →  adds [PWR] token, then flushes the complete line
