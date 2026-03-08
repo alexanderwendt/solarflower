@@ -74,6 +74,13 @@ measurements is used
 the variance shall be calculated and stored. It shall also be added to the log. Probably, the method log() has to be
 modified.
 
+### Feature: No action if Arduino voltage is too low
+If the internal voltage of the Arduino is too low defined by a variable "minInternalVoltage", the system must be idle,
+as there is no energy left to perform any movements. The system is in an error state. As long as the internal system 
+voltage is below minInternalVoltage, the system only measures this voltage and nothing else with long sleep 
+(variable longSleepTime). The default value for minInternalVoltage = 4.0V. Add the result of the measurement to
+```bool errorState = (val.down == 0 && val.up == 0);```
+
 
 ## Measurements
 While moving, the consumption is 80-180mA with 6.3V, i.e. 0.5-1.2W.
@@ -97,12 +104,7 @@ demonstrated in deep sleep tutorials (e.g., Low Power Arduino! Deep Sleep Tutori
 
 ## Outlook and Improvements
 
-### No action if Arduino voltage is too low
-If the internal voltage of the Arduino is too low defined by a variable "minInternalVoltage", the system must be idle,
-as there is no energy left to perform any movements. The system is in an error state. As long as the internal system 
-voltage is below minInternalVoltage, the system only measures this voltage and nothing else with long sleep 
-(variable longSleepTime). The default value for minInternalVoltage = 4.0V. Add the result of the measurement to
-```bool errorState = (val.down == 0 && val.up == 0);```
+
 
 ### Slow Reset after Standby
 In the night or also at daytime, in some setup, the system goes to the max positions. From there, the system never recovers

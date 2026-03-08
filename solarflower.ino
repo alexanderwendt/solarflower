@@ -44,6 +44,7 @@ namespace Config {
   const int initLoopDelay = 100;   //turn delay for the initialization
   const uint16_t shortSleepTime = 10;
   const uint16_t longSleepTime = 60;
+  const float minInternalVoltage = 4.0;
 }
 
 // ---------------------------------------------------------------------------
@@ -467,9 +468,19 @@ void loop() {
 
   // Error check
   const auto& val = sensors.getValues();
-  bool errorState = (val.down == 0 && val.up == 0);
+  bool sensorError = (val.down == 0 && val.up == 0);
+  bool lowPowerError = (val.vcc_mV < (long)(Config::minInternalVoltage * 1000));
+  bool errorState = sensorError || lowPowerError;
   if (errorState) {
-    logger.add("[ERROR] sensors U+D=0");
+    doSleep = true;
+    sleepTime = Config::longSleepTime;
+
+    if (sensorError) {
+      logger.add("[ERROR] sensors U+D=0");
+    }
+    if (lowPowerError) {
+      logger.add("[ERROR] low voltage: " + String((int)val.vcc_mV) + "mV");
+    }
   }
 
   // Reason & act  →  adds [HORZ] and [VERT] tokens
