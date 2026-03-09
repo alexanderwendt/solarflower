@@ -471,7 +471,9 @@ void handleNormalMovement(int& currentHorz, int& currentVert, bool& moveHorz, bo
   // ---- Vertical Priority Logic ----
   // If vertical angle < 40, horizontal must be STEADY before vertical moves.
   // Between 90 and 40, both can move.
-  bool verticalAllowed = (currentVert >= 40) || horizontalSteady;
+
+  bool doMoveDown = abs(val.down - val.up) > error && val.down > val.up;
+  bool verticalAllowed = (currentVert >= Config::minVerticalPriorityDegree) || horizontalSteady || doMoveDown;
 
   // ---- Vertical ----
   if (!verticalAllowed) {
