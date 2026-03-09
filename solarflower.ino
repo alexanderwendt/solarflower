@@ -530,9 +530,6 @@ void updateLogic() {
 
 void checkSlowReset() {
   int currentVert = servoVertical.getAngle();
-
-  logger.add("Temp: " + String(longSleepCount) + " sleeps. Pos: H=" + "deg, V=" + String(currentVert) + "deg. Max sleep count: " + String(Config::maxLongSleepCount) + ". minangle: " + String(Config::servoVerticalMinAngle) + ". maxangle: " + String(Config::servoVerticalMaxAngle));
-
   if (longSleepCount >= Config::maxLongSleepCount &&
       (currentVert == Config::servoVerticalMinAngle || currentVert == Config::servoVerticalMaxAngle)) {
     slowReset = true;
