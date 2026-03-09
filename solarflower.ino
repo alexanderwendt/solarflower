@@ -5,6 +5,8 @@
 *
 * Author: Alexander Wendt
 */
+//#define DEBUG
+
 #include <LowPower.h>   //Use low power between the cycles to save power
 #include <Servo.h>
 #include <math.h>
@@ -30,7 +32,7 @@ namespace Config {
   const int servoVerticalMinAngle = 0;
   const int servoVerticalMaxAngle = 90;
   const int servoHorizontalInitAngle = 135;  //set the initial angle to 90 degree, range [0, 135, 270]
-  const int servoVerticalInitAngle = 90;    //set the initial angle to 90 degree range [0 (horizontal), 90 (vertical)]
+  const int servoVerticalInitAngle = 45;    //set the initial angle to 90 degree range [0 (horizontal), 90 (vertical)]
   const byte m_speed = 20;    //set delay time to adjust the speed of servo;the longer the time, the smaller the speed
   const byte resolution = 1;  //set the rotation accuracy of the servo, the minimum rotation angle
   const bool activateMovement = true; //Activate movement
@@ -48,9 +50,14 @@ namespace Config {
   // Power
   const int initLoopDelay = 100;   //turn delay for the initialization
   const uint16_t shortSleepTime = 10;
-  const uint16_t longSleepTime = 60;
+  #ifdef DEBUG
+    const uint16_t longSleepTime = 2;
+    const int maxLongSleepCount = 2;
+  #else
+    const uint16_t longSleepTime = 60;
+    const int maxLongSleepCount = 60;
+  #endif  
   const float minInternalVoltage = 4.0;
-  const int maxLongSleepCount = 60;
 }
 
 // ---------------------------------------------------------------------------
@@ -288,8 +295,8 @@ public:
     float minCalibrationValue = 0.0;
     float maxCalibrationValue = 1023.0;
 
-    float a = 0.01;
-    float b = 0.045;
+    float a = 0.02;
+    float b = 0.06;
     float c = 0.185;
     float tao1 = 90;
     float tao2 = 650;
@@ -361,6 +368,10 @@ bool slowReset = false;
 void setup() {
   Serial.begin(9600);
   Serial.println("Start Solar Flower");
+
+  #ifdef DEBUG
+  Serial.println("Debug mode");
+  #endif
 
   powerManager.setup();
   sensors.init();
@@ -444,10 +455,10 @@ void handleNormalMovement(int& currentHorz, int& currentVert, bool& moveHorz, bo
       horzMsg = "RIGHT";
     }
 
-    if (currentHorz <= Config::servoHorizontalMinAngle) {
+    if (currentHorz < Config::servoHorizontalMinAngle) {
       currentHorz = Config::servoHorizontalMinAngle;
       horzMsg = "LEFT(LIMIT)";
-    } else if (currentHorz >= Config::servoHorizontalMaxAngle) {
+    } else if (currentHorz > Config::servoHorizontalMaxAngle) {
       currentHorz = Config::servoHorizontalMaxAngle;
       horzMsg = "RIGHT(LIMIT)";
     } else {
@@ -467,10 +478,10 @@ void handleNormalMovement(int& currentHorz, int& currentVert, bool& moveHorz, bo
       vertMsg = "DOWN";
     }
 
-    if (currentVert <= Config::servoVerticalMinAngle) {
+    if (currentVert < Config::servoVerticalMinAngle) {
       currentVert = Config::servoVerticalMinAngle;
       vertMsg = "UP(LIMIT)";
-    } else if (currentVert >= Config::servoVerticalMaxAngle) {
+    } else if (currentVert > Config::servoVerticalMaxAngle) {
       currentVert = Config::servoVerticalMaxAngle;
       vertMsg = "DOWN(LIMIT)";
     } else {
@@ -480,31 +491,35 @@ void handleNormalMovement(int& currentHorz, int& currentVert, bool& moveHorz, bo
 }
 
 void updateLogic() {
-  int currentHorz = servoHorizontal.getAngle();
-  int currentVert = servoVertical.getAngle();
+  int newHorz = servoHorizontal.getAngle();
+  int newVert = servoVertical.getAngle();
   bool moveHorz = false;
   bool moveVert = false;
   String horzMsg;
   String vertMsg;
 
   if (slowReset) {
-    handleSlowReset(currentHorz, currentVert, moveHorz, moveVert, horzMsg, vertMsg);
+    handleSlowReset(newHorz, newVert, moveHorz, moveVert, horzMsg, vertMsg);
   } else {
-    handleNormalMovement(currentHorz, currentVert, moveHorz, moveVert, horzMsg, vertMsg);
+    handleNormalMovement(newHorz, newVert, moveHorz, moveVert, horzMsg, vertMsg);
   }
 
-  logger.add("[HORZ] " + String(currentHorz) + "deg " + horzMsg);
-  logger.add("[VERT] " + String(currentVert) + "deg " + vertMsg);
+  #ifdef DEBUG
+    Serial.println("[DEBUG] slowreset: " + String(slowReset) + ". Pos: H=" + String(servoHorizontal.getAngle()) + "deg, V=" + String(servoVertical.getAngle()) + "deg");
+  #endif
+
+  logger.add("[GO HOR] " + String(newHorz) + "deg " + horzMsg);
+  logger.add("[GO VER] " + String(newVert) + "deg " + vertMsg);
 
   // ---- Apply movements ----
   if (moveHorz || moveVert) {
     doSleep = false;
     powerManager.activateServos();
     if (moveHorz) {
-      servoHorizontal.write(currentHorz);
+      servoHorizontal.write(newHorz);
     }
     if (moveVert) {
-      servoVertical.write(currentVert);
+      servoVertical.write(newVert);
     }
   } else {
     doSleep = true;
@@ -515,6 +530,9 @@ void updateLogic() {
 
 void checkSlowReset() {
   int currentVert = servoVertical.getAngle();
+
+  logger.add("Temp: " + String(longSleepCount) + " sleeps. Pos: H=" + "deg, V=" + String(currentVert) + "deg. Max sleep count: " + String(Config::maxLongSleepCount) + ". minangle: " + String(Config::servoVerticalMinAngle) + ". maxangle: " + String(Config::servoVerticalMaxAngle));
+
   if (longSleepCount >= Config::maxLongSleepCount &&
       (currentVert == Config::servoVerticalMinAngle || currentVert == Config::servoVerticalMaxAngle)) {
     slowReset = true;
