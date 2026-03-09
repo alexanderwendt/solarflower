@@ -33,6 +33,7 @@ namespace Config {
   const int servoVerticalMaxAngle = 90;
   const int servoHorizontalInitAngle = 135;  //set the initial angle to 90 degree, range [0, 135, 270]
   const int servoVerticalInitAngle = 45;    //set the initial angle to 90 degree range [0 (horizontal), 90 (vertical)]
+  const int minVerticalPriorityDegree = 40; //Below this angle, horizontal movement must be finished before vertical movement starts
   const byte m_speed = 20;    //set delay time to adjust the speed of servo;the longer the time, the smaller the speed
   const byte resolution = 1;  //set the rotation accuracy of the servo, the minimum rotation angle
   const bool activateMovement = true; //Activate movement
@@ -444,7 +445,8 @@ void handleNormalMovement(int& currentHorz, int& currentVert, bool& moveHorz, bo
   }
 
   // ---- Horizontal ----
-  if (abs(val.left - val.right) <= error) {
+  bool horizontalSteady = (abs(val.left - val.right) <= error);
+  if (horizontalSteady) {
     horzMsg = "STEADY";
   } else {
     if (val.left > val.right) {
@@ -466,8 +468,15 @@ void handleNormalMovement(int& currentHorz, int& currentVert, bool& moveHorz, bo
     }
   }
 
+  // ---- Vertical Priority Logic ----
+  // If vertical angle < 40, horizontal must be STEADY before vertical moves.
+  // Between 90 and 40, both can move.
+  bool verticalAllowed = (currentVert >= 40) || horizontalSteady;
+
   // ---- Vertical ----
-  if (abs(val.down - val.up) <= error) {
+  if (!verticalAllowed) {
+    vertMsg = "WAITING(HORZ)";
+  } else if (abs(val.down - val.up) <= error) {
     vertMsg = "STEADY";
   } else {
     if (val.down < val.up) {

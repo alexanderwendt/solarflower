@@ -81,6 +81,22 @@ voltage is below minInternalVoltage, the system only measures this voltage and n
 (variable longSleepTime). The default value for minInternalVoltage = 4.0V. Add the result of the measurement to
 ```bool errorState = (val.down == 0 && val.up == 0);```
 
+### Slow Reset after Standby
+In the night or also at daytime, in some setup, the system goes to the max positions. From there, the system never recovers
+and remains in that position forever. Only a hard reset brings the system to its original position. Therefore,
+a function shall be created that brings the system to its start position after 60 times long sleep (varibale longSleepCount).
+The logic is that if a variable "slowreset" is active it overrules the sensors and brings the servos to the init position 
+(variables servoHorizontalInitAngle and servoVerticalInitAngle) in the same incremental steps as normal movement. As
+soon as the init position is reached, deactivate "slowreset" and proceed with normal operation. 
+Example: If longSleepCount=60 and currentHorz=270, then ignore sensors and move the servos to servoHorizontalInitAngle 
+and servoVerticalInitAngle.
+
+### Move horizontally first, then vertically
+It often happens that when the system moves vertically faster than horizontally, the system gets stuck as the horizontal sensors
+are misleading. To prevent it, the system shall allow to move both horizontally and vertically at the same time as long
+as the vertical angle is between 90 and 40 degrees. < 40 degrees, the horizontal angle and movement always moves until 
+it is in a STEADY state. First then, the vertical movement starts. If the horizontal error increases to trigger a new 
+horizontal movement, the vertical movement stops until the horizontal movement is finished and then starts again.
 
 ## Measurements
 While moving, the consumption is 80-180mA with 6.3V, i.e. 0.5-1.2W.
@@ -103,18 +119,6 @@ demonstrated in deep sleep tutorials (e.g., Low Power Arduino! Deep Sleep Tutori
 
 
 ## Outlook and Improvements
-
-
-
-### Slow Reset after Standby
-In the night or also at daytime, in some setup, the system goes to the max positions. From there, the system never recovers
-and remains in that position forever. Only a hard reset brings the system to its original position. Therefore,
-a function shall be created that brings the system to its start position after 60 times long sleep (varibale longSleepCount).
-The logic is that if a variable "slowreset" is active it overrules the sensors and brings the servos to the init position 
-(variables servoHorizontalInitAngle and servoVerticalInitAngle) in the same incremental steps as normal movement. As
-soon as the init position is reached, deactivate "slowreset" and proceed with normal operation. 
-Example: If longSleepCount=60 and currentHorz=270, then ignore sensors and move the servos to servoHorizontalInitAngle 
-and servoVerticalInitAngle.
 
 
 
