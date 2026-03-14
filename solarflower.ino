@@ -575,7 +575,8 @@ bool checkErrors() {
       logger.add("[ERROR] sensors U+D=0");
     }
     if (lowPowerError) {
-      logger.add("[ERROR] low voltage: " + String((int)val.vcc_mV) + "mV");
+      sleepTime = Config::lowPowerSleeptime;  //Very long sleep time to regenerate
+      logger.add("[ERROR] low voltage: " + String((int)val.vcc_mV) + "mV" + "Sleep time: " + sleepTime);
     }
   }
   return errorState;
