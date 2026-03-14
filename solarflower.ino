@@ -10,6 +10,7 @@
 #include <LowPower.h>   //Use low power between the cycles to save power
 #include <Servo.h>
 #include <math.h>
+#include <avr/wdt.h>
 
 namespace Config {
   //--- Constants for pins ---//
@@ -50,15 +51,19 @@ namespace Config {
 
   // Power
   const int initLoopDelay = 100;   //turn delay for the initialization
-  const uint16_t shortSleepTime = 10;
   #ifdef DEBUG
+    const uint16_t shortSleepTime = 3;  //time to sleep while short after a movement
     const uint16_t longSleepTime = 2;
     const int maxLongSleepCount = 2;
+    const int lowPowerSleeptime = 3;
   #else
+    const uint16_t shortSleepTime = 30;  //time to sleep while short after a movement. 30s to prevent moving all the time as the sun moves
     const uint16_t longSleepTime = 60;
-    const int maxLongSleepCount = 60;
-  #endif  
-  const float minInternalVoltage = 4.0;
+    const int maxLongSleepCount = 60;  //Sleep count before slow reset is activated
+    const int lowPowerSleeptime = 10800; //If low power, the battery must be charged first, sleep 3h
+  #endif
+
+  const float minInternalVoltage = 4.2;  //If the internal voltage drops below 4.2V, the battery is almost empty and there is not enough power to drive the servos
 }
 
 // ---------------------------------------------------------------------------
@@ -156,6 +161,12 @@ public:
       LowPower.powerDown(SLEEP_1S, ADC_OFF, BOD_OFF);
       seconds -= 1;
     }
+  }
+
+  // Performs a rest of the whole system
+  void performReset() {
+    wdt_enable(WDTO_15MS);  // enable watchdog with short timeout
+    while (true) {}         // wait for reset
   }
 
   void idle(unsigned int ms) {
