@@ -63,7 +63,7 @@ namespace Config {
     const int lowPowerSleeptime = 10800; //If low power, the battery must be charged first, sleep 3h
   #endif
 
-  const float minInternalVoltage = 4.2;  //If the internal voltage drops below 4.2V, the battery is almost empty and there is not enough power to drive the servos
+  const float minInternalVoltage = 3.0;  //If the internal voltage drops below 4.2V, the battery is almost empty and there is not enough power to drive the servos
 }
 
 // ---------------------------------------------------------------------------
@@ -387,6 +387,8 @@ void setup() {
 
   powerManager.setup();
   sensors.init();
+  
+  delay(2000); // Let supply voltage stabilize after power-on
 
   // Initial read
   sensors.read(powerManager);

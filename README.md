@@ -60,11 +60,7 @@ Additionally, the on-board DC-DC converter was removed. This modification means 
 
 ### Troubleshooting
 If the serial connection is unstable or uploads do not work reliably, lower the baud rate. A working setting for this setup is:
-
-```text
-Setting baud rate     : 57600
-```
-
+ATmega328P Old bootloader with baud rate 57600
 
 ### Mosfet IRFZ44N
 <img src="doc/media/irfz44n.jpg" alt="Mosfet IRFZ44N" width="360">
