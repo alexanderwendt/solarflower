@@ -6,15 +6,50 @@ This project was born from a desire to create an efficient solar tracker, often 
 
 
 ## Hardware Setup
-From Amazon, I bought (KEYESTUDIO DIY Solar Tracking Electronic Kit for Arduino UNO IDE, Temperature and Humidity Sensor,BH1750 Light Sensor etc.Edu Programming Program for Adults)[https://www.amazon.de/dp/B0B1NWBTS4?ref=ppx_yo2ov_dt_b_fed_asin_title&th=1]
-with an Arduino Uno and all necessary components. However, I wanted to improve the accuracy and duration of the system. 
+From Amazon, I bought [KEYESTUDIO DIY Solar Tracking Electronic Kit for Arduino UNO IDE, Temperature and Humidity Sensor, BH1750 Light Sensor etc. Edu Programming Program for Adults](https://www.amazon.de/dp/B0B1NWBTS4?ref=ppx_yo2ov_dt_b_fed_asin_title&th=1)
+with an Arduino Uno and all necessary components. However, I wanted to improve the accuracy and duration of the system.
 
-To improve the accuracy, I put the photo sensors on the back side of the photovoltaic cell, to get the sensors to move with the photovoltaic cell. The principle behind it, is that 
-the whole system shall move in the direction of the light. If the left photo sensor gets more light that the right sensor, then move to the left.
+To improve the accuracy, I put the photo sensors on the back side of the photovoltaic cell, so the sensors move with the photovoltaic cell. The principle is that the whole system moves in the direction of the light. If the left photo sensor gets more light than the right sensor, then the system moves to the left.
 
-The circuit plan is presented in ![Circuit Diagram](doc/media/circuit.png).
+![Circuit Diagram](doc/media/circuit.png)
 
-A photo of the setup: ![Breadboard Circuit](doc/media/breadboard_circuit.jpg)
+The circuit plan shows the power switching, the four photoresistors, the servo control lines, and the regulated 5V supply.
+
+![Breadboard Circuit](doc/media/breadboard_circuit.jpg)
+
+This photo shows the first breadboard wiring of the circuit.
+
+![Breadboard With Capacitors](doc/media/breadboard.jpg)
+
+The final breadboard adds capacitors (condensators) near the motor power lines. They were added after the motors sometimes made strange, uncontrolled movements. The reason is that servos create short current peaks when they start, stop, or hold position under load. Those current peaks can pull the supply voltage down for a very short time and inject electrical noise into the circuit. The capacitors act as local energy buffers: they provide current during these short peaks and smooth voltage drops before they disturb the Arduino, the sensors, or the servo signal.
+
+![Capacitors On Breadboard](doc/media/condensators_on_breadboard.jpg)
+
+![Capacitors On Breadboard Detail](doc/media/condensators_on_breadboard_2.jpg)
+
+The capacitor placement is intentionally close to the breadboard power rails and motor supply wiring, because long wires and breadboard contacts add resistance and inductance. Local buffering is most effective when it is physically close to the load that causes the disturbance.
+
+### Solar Flower Assembly
+
+![Solar Flower Front](doc/media/solarflower_front.jpg)
+
+The front view shows the photovoltaic cell and the flower structure that is moved by the two servos.
+
+![Solar Flower Front Detail](doc/media/solarflower_front_2.jpg)
+
+This view shows the final front assembly with the sensor and panel arrangement.
+
+![Solar Flower Rear](doc/media/solarflower_rear.jpg)
+
+The rear view shows the electronics and wiring attached behind the moving panel.
+
+![Solar Flower Top](doc/media/solarflower_top_1.jpg)
+
+The top view shows the geometry of the panel, light sensors, and mechanical movement axes.
+
+![Movement To Sun](doc/media/movement_to_sun.gif)
+
+The tracker moves in small steps toward the stronger light source instead of running continuously. This keeps the control simple and reduces unnecessary motor activity.
 
 ### Arduino
 ![Arduino Nano Upper Side](doc/media/arduino_nano_upper_side.jpg)
@@ -23,80 +58,149 @@ To minimize power consumption, the power LED resistor was removed. This modifica
 ![Arduino Nano Bottom Side](doc/media/arduino_nano_bottom_side.jpg)
 Additionally, the on-board DC-DC converter was removed. This modification means that the VIN pin can no longer be used with higher voltages without risking damage to the board. Consequently, the only safe power input is directly via the 5V pin, requiring a precisely regulated 5V supply. This further streamlines power usage by bypassing the inefficiencies of the on-board converter.
 
+### Troubleshooting
+If the serial connection is unstable or uploads do not work reliably, lower the baud rate. A working setting for this setup is:
+
+```text
+Setting baud rate     : 57600
+```
+
 
 ### Mosfet IRFZ44N
-![Mosfet IRFZ44N](doc/media/irfz44n.jpg)
+<img src="doc/media/irfz44n.jpg" alt="Mosfet IRFZ44N" width="360">
 
 In standby mode the sensors shall not consume any energy. Therefore, the ground part of the circuit 
 is turned off with a signal 0 on D4. In case of signal 1, the mosfet lets the current pass to ground. 
 Resistors are crucial with MOSFETs due to the MOSFET's gate capacitance. When switching a MOSFET, this capacitance needs to be charged or discharged. Without a gate resistor, a large current can flow, potentially damaging the driving circuit (e.g., a microcontroller). The resistor limits this current, protecting the driver and controlling the MOSFET's switching speed. This controlled switching is vital for managing electromagnetic interference (EMI) and preventing unwanted oscillations or "ringing" in the circuit.
 
 ### DC-DC Converter
-![DC-DC Converter](doc/media/dc-dc_converter.jpg)
+<img src="doc/media/dc-dc_converter.jpg" alt="DC-DC Converter" width="360">
 
 The input voltage from the solar converter is around 6.3V. For the arduino and the photo resistors, it shall be
 5V. Therefore, I use a dc-dc converter from 6.3V to 5V for up to 100mA load with a very low extra power consumption. 
 
+![Solar Converter](doc/media/solarflower_solar_converter.jpg)
+
+The solar converter charges the battery from the photovoltaic cell and provides the input voltage for the tracker electronics.
+
+![Battery](doc/media/solarflower_battery.jpg)
+
+The battery is the energy buffer for the system. The software avoids movement when the measured internal voltage is too low, because servo movements need short current peaks and should not be attempted when the battery is nearly empty.
+
 ### Relay
-![Relay](doc/media/relay.jpg)
+<img src="doc/media/relay.jpg" alt="Relay" width="360">
 
 Relays are used to control higher power loads with a low-power signal from the Arduino. In this setup, a relay is essential because servo motors, especially when multiple are used or under load, can draw significant current that an Arduino's digital pins cannot directly supply. The relay acts as an electrically operated switch, isolating the Arduino's delicate control circuitry from the higher current demands of the servos, ensuring stable operation and protecting the microcontroller. According to IoTspace.dev [Arduino Relais ansteuern – Schaltplan und Sketch], relays are crucial for such applications due to the limited current and voltage capabilities of microcontrollers.
 
 ### Servos
 
-![Servos](doc/media/servos.jpg)
-
-*(Placeholder image for servos)*
-
-
-
 The solar flower utilizes two servo motors for precise positioning. A 360° servo is employed for horizontal tracking, allowing continuous rotation to follow the sun's azimuth. For vertical adjustment (altitude), a 180° servo provides the necessary range of motion. These servos receive control signals from the Arduino, but their power supply is managed through the relay to handle their current demands safely and efficiently.
 
-
-
-
-
 ## Software
-The core logic for the solar tracker is contained within `solarflower.ino`. This Arduino sketch is responsible for:
-*   **Light Sensing:** Reading input from four photoresistors (LDRs) strategically placed to detect light intensity from different directions (Up, Down, Left, Right).
-*   **Directional Control:** Calculating the optimal direction for the solar panel by comparing light intensities and controlling two servo motors—one for horizontal (azimuth) and one for vertical (altitude) movement.
-*   **Power Management:** Implementing advanced power-saving techniques, including deep sleep modes using the `LowPower` library, to significantly reduce energy consumption when the system is idle or during low light conditions. This includes deactivating power to sensors and servos when not in active use.
-*   **Calibration & Error Handling:** Incorporating calibration for photoresistor readings and checking for potential error states, such as disconnected sensors, to ensure reliable operation.
-*   **Serial Communication:** Providing serial output for debugging and monitoring sensor values and servo positions.
+The core logic for the solar tracker is contained within `solarflower.ino`. The purpose of the logic is to move only when movement is useful, keep the flower pointed toward the strongest light source, avoid unstable motor behavior, protect the battery, and recover from edge positions without requiring a manual reset.
 
-### Feature: Multiple measurements with the Photoresistors
-The solar flower measures resistance on the photoresistors and moves. During the measurements and movements of the servos,
-the voltage varies, which influences the measurements. To get more accurate measurements and to prevent unnecessary
-movements of the servos, do the following:
-- each measurement shall be executed 3 times with 100ms interval (static int variable) and the average of the 
-measurements is used
-- We measure top, bottom, right and left sensors and calculate the average of them. Of the three measured averages, 
-the variance shall be calculated and stored. It shall also be added to the log. Probably, the method log() has to be
-modified.
+The sketch is responsible for:
+- **Light sensing:** Read four photoresistors: up, down, left, and right.
+- **Directional control:** Compare left/right for horizontal movement and up/down for vertical movement.
+- **Power management:** Switch sensors and servos off when they are not needed, then use `LowPower.powerDown()` between cycles.
+- **Noise reduction:** Take several sensor measurements per cycle and use averages instead of a single reading.
+- **Error handling:** Stop normal movement when the voltage is too low or the sensor state is invalid.
+- **Recovery:** Slowly return the flower to its initial position after many long sleep cycles at a vertical end stop.
+- **Logging:** Print one structured line per loop with sensor values, movement decisions, voltage, and power state.
 
-### Feature: No action if Arduino voltage is too low
-If the internal voltage of the Arduino is too low defined by a variable "minInternalVoltage", the system must be idle,
-as there is no energy left to perform any movements. The system is in an error state. As long as the internal system 
-voltage is below minInternalVoltage, the system only measures this voltage and nothing else with long sleep 
-(variable longSleepTime). The default value for minInternalVoltage = 4.0V. Add the result of the measurement to
-```bool errorState = (val.down == 0 && val.up == 0);```
+### Sensor Measurement
+Each loop starts by powering the sensors, waiting for the readings to stabilize, and measuring each photoresistor three times with a 100ms interval. The code averages the three readings for each direction and also calculates the variance of the average light level across the three measurements.
 
-### Slow Reset after Standby
-In the night or also at daytime, in some setup, the system goes to the max positions. From there, the system never recovers
-and remains in that position forever. Only a hard reset brings the system to its original position. Therefore,
-a function shall be created that brings the system to its start position after 60 times long sleep (varibale longSleepCount).
-The logic is that if a variable "slowreset" is active it overrules the sensors and brings the servos to the init position 
-(variables servoHorizontalInitAngle and servoVerticalInitAngle) in the same incremental steps as normal movement. As
-soon as the init position is reached, deactivate "slowreset" and proceed with normal operation. 
-Example: If longSleepCount=60 and currentHorz=270, then ignore sensors and move the servos to servoHorizontalInitAngle 
-and servoVerticalInitAngle.
+The averaging avoids movement caused by short voltage dips or electrical noise. The variance is logged so unstable measurements can be recognized in the serial output.
 
-### Move horizontally first, then vertically
-It often happens that when the system moves vertically faster than horizontally, the system gets stuck as the horizontal sensors
-are misleading. To prevent it, the system shall allow to move both horizontally and vertically at the same time as long
-as the vertical angle is between 90 and 40 degrees. < 40 degrees, the horizontal angle and movement always moves until 
-it is in a STEADY state. First then, the vertical movement starts. If the horizontal error increases to trigger a new 
-horizontal movement, the vertical movement stops until the horizontal movement is finished and then starts again.
+Example log token:
+
+```text
+[SENSORS] U:642 D:616 L:572 R:655 avg:621 var:0.00 Vcc:4829mV
+```
+
+### Error Thresholds
+The tracker does not react to every small sensor difference. It uses an error threshold so small differences do not cause constant jitter.
+
+- `initError`: small threshold for normal tracking.
+- `afterSleepError`: larger threshold directly after sleep.
+- `lowLightError`: larger threshold when the average light value is below `minPhotoResistorSolarValue`.
+
+This prevents unnecessary servo movements when the sun moves only slightly, the sensor readings fluctuate, or the light is too weak for useful tracking.
+
+### Horizontal Movement
+Horizontal movement is decided first because the left/right position strongly affects whether the vertical sensors are meaningful.
+
+- If `abs(left - right) <= error`, horizontal is `STEADY` and the horizontal servo does not move.
+- If `left > right`, the target angle is reduced by `resolution` and the log state is `LEFT`.
+- If `right > left`, the target angle is increased by `resolution` and the log state is `RIGHT`.
+- If the target angle would go below `servoHorizontalMinAngle`, it is clamped and logged as `LEFT(LIMIT)`.
+- If the target angle would go above `servoHorizontalMaxAngle`, it is clamped and logged as `RIGHT(LIMIT)`.
+- `moveHorz` is only true when the horizontal servo will actually receive a new angle. A limit state is not movement.
+
+This distinction matters because vertical movement is allowed whenever horizontal is not actually moving, including the cases `STEADY`, `LEFT(LIMIT)`, and `RIGHT(LIMIT)`.
+
+### Vertical Movement Priority
+The vertical priority logic exists because the flower can get stuck when it moves vertically too early. At low vertical angles, the panel geometry can make the horizontal sensors misleading. The code therefore gives horizontal movement priority only when horizontal movement is really possible and active.
+
+Vertical movement is allowed when at least one of these cases is true:
+
+- The current vertical angle is at or above `minVerticalPriorityDegree` (`40deg`), so both axes may move.
+- The horizontal motor is not moving (`!moveHorz`), including horizontal steady and horizontal limit states.
+- The requested vertical direction is downward, because moving down helps recover from the critical low-angle area.
+
+If none of these cases is true, vertical movement is blocked and logged as `WAITING(HORZ)`.
+
+After vertical movement is allowed, the up/down decision is:
+
+- If `abs(down - up) <= error`, vertical is `STEADY`.
+- If `up > down`, the target angle is reduced and logged as `UP`.
+- If `down > up`, the target angle is increased and logged as `DOWN`.
+- If the target angle would exceed the configured vertical limits, it is clamped and logged as `UP(LIMIT)` or `DOWN(LIMIT)`.
+
+The important rule is: any time the horizontal motor does not move, the vertical motor is allowed to move if the up/down sensors request it.
+
+### Applying Movement
+After the target angles are calculated, the code powers the servos only if at least one axis must move. Then it writes the new horizontal and/or vertical angle.
+
+- If `moveHorz || moveVert` is true, servo power is activated and the system stays active for `initLoopDelay`.
+- If neither axis moves, servo power is deactivated and the system sleeps.
+
+This keeps motor power off during standby and prevents the servos from consuming holding current all the time.
+
+### Sleep Behavior
+The software uses two normal sleep durations:
+
+- `shortSleepTime`: used after recent movement or when the system should check again soon.
+- `longSleepTime`: used after repeated idle cycles.
+
+`longSleepCount` tracks how often the system has slept. When movement happens, `longSleepCount` is reset to zero. When the system sleeps, the count is increased and included in the log.
+
+### Low Voltage Protection
+The Arduino measures its own Vcc. If it drops below `minInternalVoltage`, the system enters an error state and does not move the servos. Instead, it sleeps for `lowPowerSleeptime` so the battery can recover through solar charging.
+
+This protects the battery and avoids brownout-like behavior, where the servos pull the voltage down and cause unstable electronics.
+
+### Slow Reset Recovery
+If the flower has slept for many long cycles and the vertical axis is at its minimum or maximum angle, `slowReset` is activated. In slow reset mode, the sensor values are ignored and both servos move step by step back to the configured initial angles:
+
+- Horizontal returns to `servoHorizontalInitAngle`.
+- Vertical returns to `servoVerticalInitAngle`.
+- The movement uses the same `resolution` step size as normal tracking.
+- When both axes reach their initial angles, slow reset ends and normal tracking resumes.
+
+This handles cases where the flower reached an end position during weak light, night, shadows, or misleading sensor readings.
+
+### Log Format
+Every loop produces one compact log line. The line contains sensor values, movement decisions, and the final power state.
+
+Example:
+
+```text
+[SENSORS] U:642 D:616 L:572 R:655 avg:621 var:0.00 Vcc:4829mV | [GO HOR] 270deg RIGHT(LIMIT) | [GO VER] 38deg UP | [PWR] ACTIVE 100ms
+```
+
+In this example, the horizontal axis wanted to move right but was already at the right limit, so the horizontal motor did not move. Because horizontal was not actually moving, vertical movement was allowed.
 
 ## Measurements
 While moving, the consumption is 80-180mA with 6.3V, i.e. 0.5-1.2W.
@@ -104,6 +208,10 @@ While moving, the consumption is 80-180mA with 6.3V, i.e. 0.5-1.2W.
 If active and not moving, the consumption is 78mA, i.e. 0.5W
 
 Standby power consumption: 0.06mA, i.e. 0.4mW.
+
+![Minimum Consumption](doc/media/min_consumption_006_mA.jpg)
+
+The measurement shows the very low standby current after the Arduino and peripheral power-saving changes. This is the main reason for switching off sensors and servos between tracking cycles instead of leaving the whole circuit powered.
 
 For context, a typical Arduino Nano can consume around 25 mA (approximately 0.125W at 5V) in 
 normal operation and about 7.5 mA (0.0375W at 5V) in standby mode without specific power-saving 

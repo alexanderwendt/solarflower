@@ -45,7 +45,7 @@ namespace Config {
   const byte afterSleepError = 10; //Directly after sleep, use a higher tolerance value to prevent the system from moving just a little
   const int photoRightCalibration = -30;  //Balance sensors as they are not equally calibrated
   const int photoRightMinCalibration = -20;  //Balance the minimum calibration value, by setting the min value, which the calibration can do
-  const int minPhotoResistorSolarValue = 730; //The min average value of the photoresistors to be able to generate power with the PV
+  const int minPhotoResistorSolarValue = 430; //The min average value of the photoresistors to be able to generate power with the PV
   const byte measurementsPerCycle = 3;      //Number of measurements to average
   const int measurementInterval = 100;      //Interval between measurements in ms
 
@@ -257,11 +257,11 @@ public:
     int iterAverages[Config::measurementsPerCycle];
 
     for (byte i = 0; i < Config::measurementsPerCycle; i++) {
-      int d = analogRead(Config::photoDown);
-      int rawL = analogRead(Config::photoLeft);
-      int l = adjustLeftSensor(rawL);
-      int u = analogRead(Config::photoUp);
-      int rawR = analogRead(Config::photoRight);
+      int d = 1023 - analogRead(Config::photoDown); //Inverted photoresistors, 0 = very bright, 1023 = dark
+      int rawL = 1023 - analogRead(Config::photoLeft);
+      int l = rawL; //adjustLeftSensor(rawL);
+      int u = 1023 - analogRead(Config::photoUp);
+      int rawR = 1023 - analogRead(Config::photoRight);
       int r = rawR;
 
       sumDown += d;
@@ -480,11 +480,11 @@ void handleNormalMovement(int& currentHorz, int& currentVert, bool& moveHorz, bo
   }
 
   // ---- Vertical Priority Logic ----
-  // If vertical angle < 40, horizontal must be STEADY before vertical moves.
+  // If vertical angle < 40, vertical waits only while horizontal will actually move.
   // Between 90 and 40, both can move.
 
   bool doMoveDown = abs(val.down - val.up) > error && val.down > val.up;
-  bool verticalAllowed = (currentVert >= Config::minVerticalPriorityDegree) || horizontalSteady || doMoveDown;
+  bool verticalAllowed = (currentVert >= Config::minVerticalPriorityDegree) || !moveHorz || doMoveDown;
 
   // ---- Vertical ----
   if (!verticalAllowed) {
@@ -561,7 +561,7 @@ void checkSlowReset() {
 
 bool checkErrors() {
   const auto& val = sensors.getValues();
-  bool sensorError = (val.down == 0 && val.up == 0);
+  bool sensorError = (val.down == 1023 && val.up == 1023);
   bool lowPowerError = (val.vcc_mV < (long)(Config::minInternalVoltage * 1000));
 
   // Slow reset overrules sensor error but not low power
