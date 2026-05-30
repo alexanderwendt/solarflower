@@ -29,6 +29,22 @@ The final breadboard adds capacitors (condensators) near the motor power lines. 
 
 The capacitor placement is intentionally close to the breadboard power rails and motor supply wiring, because long wires and breadboard contacts add resistance and inductance. Local buffering is most effective when it is physically close to the load that causes the disturbance.
 
+### Sensor Calibration
+
+The four photoresistors must be calibrated as pairs before they are mounted in the tracker. The important requirement is that the Top-Bottom pair and the Left-Right pair show the same measurement curves. If the paired sensors are not calibrated together, one side will always behave differently from the other side and the tracker can turn away from the optimal direction.
+
+This is especially important across different light intensities. Two uncalibrated sensors may show the same value in low light, but differ significantly at higher light intensities. I tried to compensate for bad calibration in software, but this is a very hard task and did not work well enough.
+
+The calibration method is:
+
+1. Measure all photoresistors under constant low light intensity.
+2. Measure all photoresistors under constant high light intensity.
+3. Compare the values and select sensor pairs that match at both light levels. These matching pairs can then be used for the Top-Bottom and Left-Right sensor positions.
+
+![Photoresistor calibration measurements at low and high light intensity](doc/media/calibration.jpg)
+
+The image shows the measured photoresistor values at low and high light intensity, making it easier to identify matching sensor pairs for the Top-Bottom and Left-Right positions.
+
 ### Solar Flower Assembly
 
 ![Solar Flower Front](doc/media/solarflower_front.jpg)
@@ -199,6 +215,23 @@ Example:
 In this example, the horizontal axis wanted to move right but was already at the right limit, so the horizontal motor did not move. Because horizontal was not actually moving, vertical movement was allowed.
 
 ## Measurements
+
+### Battery Capacity
+
+The battery used in this setup is an 18650-style lithium-ion cell. Its remaining capacity can be roughly estimated by measuring the DC voltage with a multimeter. This is not an exact capacity measurement, because lithium-ion batteries have a relatively flat discharge curve and the measured voltage depends on load, temperature, battery age, and whether the battery has just been charged or discharged. For a practical field check, however, the voltage is still useful.
+
+Set the multimeter to DC voltage and measure directly across the battery terminals. If possible, measure the battery after it has rested for a short time without charging or powering the tracker, because servo load peaks can temporarily pull the voltage down.
+
+![Battery voltage measurement with a multimeter](doc/media/battery_measurement.jpg)
+
+The measurement shows the battery voltage check with a multimeter.
+
+A typical lithium-ion cell has a nominal voltage around 3.6-3.7V and is normally charged up to about 4.2V per cell. In this setup, a fully charged battery measurement is around 4.0V. If the measured voltage drops below around 3.2V, the battery is very discharged for this application. At that point there is not enough stable power to run the servos reliably, because the short servo current peaks can make the voltage sag further.
+
+The software handles this case in [Low Voltage Protection](#low-voltage-protection). The Arduino measures its internal voltage, and if it drops below the configured limit, the system stops moving the servos and sleeps instead. This prevents the tracker from repeatedly starting, pulling the voltage down, stopping, and starting again.
+
+### Minimum Power Consumption
+
 While moving, the consumption is 80-180mA with 6.3V, i.e. 0.5-1.2W.
 
 If active and not moving, the consumption is 78mA, i.e. 0.5W
@@ -251,6 +284,25 @@ demonstrated in deep sleep tutorials (e.g., Low Power Arduino! Deep Sleep Tutori
     -   **Accessed on:** February 14, 2026
     -   **Content:** This article details the Arduino Nano's power consumption, noting approximately 25 mA in normal operation and 7.5 mA in standby. It highlights that additional components increase power usage and suggests using a multimeter for precise measurements and a Low Power Library for further reduction during idle times.
 
+### Battery Voltage & State of Charge
+-   **Title:** BU-409: Charging Lithium-ion
+    -   **Author:** Battery University
+    -   **Link:** https://www.batteryuniversity.com/article/bu-409-charging-lithium-ion
+    -   **Accessed on:** May 30, 2026
+    -   **Content:** This article explains lithium-ion charging behavior, including the common 4.20V per-cell charge voltage and why charging is stopped when the current has dropped sufficiently.
+
+-   **Title:** BU-903: How to Measure State-of-charge
+    -   **Author:** Battery University
+    -   **Link:** https://batteryuniversity.com/article/bu-903-how-to-measure-state-of-charge
+    -   **Accessed on:** May 30, 2026
+    -   **Content:** This article explains that voltage-based state-of-charge measurement is simple but imprecise, especially for lithium-based batteries and when the battery has recently been charged or discharged.
+
+-   **Title:** NCR18650GA: Lithium-ion Batteries
+    -   **Author:** Panasonic Energy
+    -   **Link:** https://energy.panasonic.com/language-masters/en/business/products/lithium-ion/models/NCR18650GA
+    -   **Accessed on:** May 30, 2026
+    -   **Content:** This product page gives an example 18650 lithium-ion cell with a nominal voltage of 3.60V.
+
 ### MOSFET Usage
 -   **Title:** How to use Mosfet
     -   **Author:** Ingenieursmentalität
@@ -270,9 +322,6 @@ demonstrated in deep sleep tutorials (e.g., Low Power Arduino! Deep Sleep Tutori
     -   **Link:** https://iotspace.dev/arduino-relais-ansteuern-schaltplan-und-sketch/
     -   **Accessed on:** February 14, 2026
     -   **Content:** This article explains controlling relays with Arduino, essential for home automation due to microcontrollers' limited current/voltage. It covers relay types (1, 2, 4-channel), selection criteria (voltage, current, triggers), and provides wiring/sketch examples for a 2-channel module.
-
-
-
 
 
 
