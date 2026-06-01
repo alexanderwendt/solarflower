@@ -47,6 +47,8 @@ The image shows the measured photoresistor values at low and high light intensit
 
 ### Solar Flower Assembly
 
+I bought the KEYESTUDIO DIY Solar Tracking Electronic Kit from Amazon and modified the assembly.
+
 ![Solar Flower Front](doc/media/solarflower_front.jpg)
 
 The front view shows the photovoltaic cell and the flower structure that is moved by the two servos.
