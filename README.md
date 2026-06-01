@@ -256,11 +256,14 @@ demonstrated in deep sleep tutorials (e.g., Low Power Arduino! Deep Sleep Tutori
 
 
 ## Outlook and Improvements
+TBD
 
 
+## Usages
 
+One practical use of the solar flower is charging a phone from a small custom loading box. The box contains two 18650-style lithium-ion batteries that act as an energy buffer between the solar charging circuit and the phone. This makes the setup more stable than connecting the phone directly to the solar panel, because the batteries can store energy while the panel is in sunlight and provide a steadier output when the light changes.
 
-
+![Phone load connected to the solar flower](doc/media/load_phone.jpg)
 
 
 ## Related Work
@@ -322,6 +325,3 @@ demonstrated in deep sleep tutorials (e.g., Low Power Arduino! Deep Sleep Tutori
     -   **Link:** https://iotspace.dev/arduino-relais-ansteuern-schaltplan-und-sketch/
     -   **Accessed on:** February 14, 2026
     -   **Content:** This article explains controlling relays with Arduino, essential for home automation due to microcontrollers' limited current/voltage. It covers relay types (1, 2, 4-channel), selection criteria (voltage, current, triggers), and provides wiring/sketch examples for a 2-channel module.
-
-
-
