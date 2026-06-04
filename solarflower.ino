@@ -43,8 +43,6 @@ namespace Config {
   const byte initError = 5;      //Define the error range to prevent vibration
   const byte lowLightError = 60;  //Error to consider if the light is weak, else the system moves around withoout having any light
   const byte afterSleepError = 10; //Directly after sleep, use a higher tolerance value to prevent the system from moving just a little
-  const int photoRightCalibration = -30;  //Balance sensors as they are not equally calibrated
-  const int photoRightMinCalibration = -20;  //Balance the minimum calibration value, by setting the min value, which the calibration can do
   const int minPhotoResistorSolarValue = 430; //The min average value of the photoresistors to be able to generate power with the PV
   const byte measurementsPerCycle = 3;      //Number of measurements to average
   const int measurementInterval = 100;      //Interval between measurements in ms
@@ -259,7 +257,7 @@ public:
     for (byte i = 0; i < Config::measurementsPerCycle; i++) {
       int d = 1023 - analogRead(Config::photoDown); //Inverted photoresistors, 0 = very bright, 1023 = dark
       int rawL = 1023 - analogRead(Config::photoLeft);
-      int l = rawL; //adjustLeftSensor(rawL);
+      int l = rawL;
       int u = 1023 - analogRead(Config::photoUp);
       int rawR = 1023 - analogRead(Config::photoRight);
       int r = rawR;
@@ -301,30 +299,6 @@ public:
 
     log();
     return _readings;
-  }
-
-  int adjustLeftSensor(int rawValue) {
-    float minCalibrationValue = 0.0;
-    float maxCalibrationValue = 1023.0;
-
-    float a = 0.02;
-    float b = 0.06;
-    float c = 0.185;
-    float tao1 = 90;
-    float tao2 = 650;
-
-    float calibrationValue = a + b * exp(-(float)rawValue/tao1) + c * exp(-(float)rawValue/tao2);
-    float newSensorValue = (float)rawValue * (1 + calibrationValue);
-
-    float correctedSensorValue = newSensorValue;
-    if (newSensorValue > maxCalibrationValue) {
-      correctedSensorValue = maxCalibrationValue;
-    }
-    if (newSensorValue < minCalibrationValue) {
-      correctedSensorValue = minCalibrationValue;
-    }
-
-    return (int)correctedSensorValue;
   }
 
   void log() {
