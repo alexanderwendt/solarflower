@@ -61,7 +61,7 @@ namespace Config {
     const int lowPowerSleeptime = 10800; //If low power, the battery must be charged first, sleep 3h
   #endif
 
-  const float minInternalVoltage = 3.0;  //If the internal voltage drops below 4.2V, the battery is almost empty and there is not enough power to drive the servos
+  const float minInternalVoltage = 3.0;  //If the internal voltage drops below 3.0V, the battery is almost empty and there is not enough power to drive the servos
 }
 
 // ---------------------------------------------------------------------------
@@ -71,11 +71,13 @@ namespace Config {
 // ---------------------------------------------------------------------------
 class Logger {
 public:
+  // Clears the current log line so a new loop cycle can collect fresh tokens.
   void clear() {
     _buf[0] = '\0';
     _len = 0;
   }
 
+  // Adds one token to the current log line, separated from previous tokens.
   void add(const String& token) {
     if (_len > 0) {
       append(" | ");
@@ -83,6 +85,7 @@ public:
     append(token.c_str());
   }
 
+  // Prints the collected log line and clears the buffer afterwards.
   void flush() {
     Serial.println(_buf);
     clear();
@@ -92,6 +95,7 @@ private:
   char _buf[256];
   int  _len = 0;
 
+  // Appends text to the internal buffer while preventing buffer overflow.
   void append(const char* s) {
     while (*s && _len < (int)sizeof(_buf) - 1) {
       _buf[_len++] = *s++;
@@ -106,8 +110,10 @@ Logger logger;
 
 class PowerManager {
 public:
+  // Stores the pins used to switch sensor and servo power.
   PowerManager(byte sensorPin, byte servoPin) : _sensorPin(sensorPin), _servoPin(servoPin) {}
 
+  // Configures power control pins and starts with sensors and servos switched off.
   void setup() {
     pinMode(_sensorPin, OUTPUT);
     pinMode(_servoPin, OUTPUT);
@@ -116,29 +122,35 @@ public:
     off(); // Start in safe/off state
   }
 
+  // Switches the sensor power on and waits until readings are stable.
   void activateSensors() {
     digitalWrite(_sensorPin, HIGH);
     delay(400); // Stabilization delay from original readPhotoSensors
   }
 
+  // Switches the sensor power off to reduce current draw.
   void deactivateSensors() {
     digitalWrite(_sensorPin, LOW);
   }
 
+  // Switches the servo power on and waits until the supply is ready.
   void activateServos() {
     digitalWrite(_servoPin, LOW);
     delay(200); // Power up delay
   }
 
+  // Switches the servo power off to reduce current draw.
   void deactivateServos() {
     digitalWrite(_servoPin, HIGH);
   }
 
+  // Switches all controlled loads off.
   void off() {
     deactivateSensors();
     deactivateServos();
   }
 
+  // Sleeps for the requested duration by chaining watchdog sleep intervals.
   void sleep(uint16_t seconds) {
     off(); // Ensure everything is off
 
@@ -161,12 +173,13 @@ public:
     }
   }
 
-  // Performs a rest of the whole system
+  // Performs a reset of the whole system using the watchdog timer.
   void performReset() {
     wdt_enable(WDTO_15MS);  // enable watchdog with short timeout
     while (true) {}         // wait for reset
   }
 
+  // Keeps the controller awake for a short active delay.
   void idle(unsigned int ms) {
     delay(ms);
   }
@@ -178,9 +191,11 @@ private:
 
 class SolarServo {
 public:
+  // Stores servo pin and angle limits for later movement commands.
   SolarServo(byte pin, int minAngle, int maxAngle)
     : _pin(pin), _angle(0), _minAngle(minAngle), _maxAngle(maxAngle) {}
 
+  // Attaches the servo output if it is not attached yet.
   void attach() {
     if (!_servo.attached()) {
       _servo.attach(_pin);
@@ -188,12 +203,14 @@ public:
     }
   }
 
+  // Detaches the servo output so the pin stops generating pulses.
   void detach() {
     if (_servo.attached()) {
       _servo.detach();
     }
   }
 
+  // Moves the servo to a constrained logical angle using calibrated pulse widths.
   void write(int angle) {
     _angle = constrain(angle, _minAngle, _maxAngle);
 
@@ -209,9 +226,12 @@ public:
     delay(200); // Allow servo time to reach position
   }
 
+  // Returns the last commanded logical angle.
   int getAngle() {
     return _angle;
   }
+
+  // Updates the stored logical angle without physically moving the servo.
   void setAngleNoMove(int angle) {
     _angle = angle;
   }
@@ -236,8 +256,10 @@ public:
     long vcc_mV;
   };
 
+  // Creates the sensor array wrapper; hardware setup is done separately in init().
   LightSensorArray() {}
 
+  // Configures all photo resistor pins as inputs.
   void init() {
     pinMode(Config::photoDown, INPUT);
     pinMode(Config::photoLeft, INPUT);
@@ -245,6 +267,7 @@ public:
     pinMode(Config::photoRight, INPUT);
   }
 
+  // Powers sensors, reads and averages photo resistor values, measures Vcc, and logs the result.
   const Readings& read(PowerManager& pm) {
     pm.activateSensors();
 
@@ -301,6 +324,7 @@ public:
     return _readings;
   }
 
+  // Adds the latest sensor values to the structured loop log.
   void log() {
     logger.add("[SENSORS] U:" + String(_readings.up)    +
                " D:"          + String(_readings.down)  +
@@ -311,13 +335,20 @@ public:
                " Vcc:"        + String((int)_readings.vcc_mV) + "mV");
   }
 
+  // Returns the latest cached sensor and voltage readings.
   const Readings& getValues() {
     return _readings;
+  }
+
+  // Measures and returns the current live supply voltage without using cached readings.
+  long measureVcc_mV() {
+    return readVcc_mV();
   }
 
 private:
   Readings _readings;
 
+  // Measures supply voltage in millivolts using the internal 1.1V reference.
   long readVcc_mV() {
     uint8_t admux_old = ADMUX;
 
@@ -350,7 +381,12 @@ bool doSleep = false;
 int sleepTime = Config::shortSleepTime;
 bool slowReset = false;
 
+void applyLowPowerSleep(const String& reason, long vcc_mV);
+bool hasLowPowerError();
+bool hasLowPowerError(long& vcc_mV);
 
+
+// Initializes serial output, power control, sensors, and the servo start position.
 void setup() {
   Serial.begin(9600);
   Serial.println("Start Solar Flower");
@@ -380,6 +416,7 @@ void setup() {
   delay(1000);
 }
 
+// Moves both servo targets step-by-step back to their configured initial angles.
 void handleSlowReset(int& currentHorz, int& currentVert, bool& moveHorz, bool& moveVert, String& horzMsg, String& vertMsg) {
   if (currentHorz != Config::servoHorizontalInitAngle) {
     if (currentHorz < Config::servoHorizontalInitAngle) {
@@ -412,6 +449,7 @@ void handleSlowReset(int& currentHorz, int& currentVert, bool& moveHorz, bool& m
   sleepTime = Config::shortSleepTime;
 }
 
+// Calculates normal tracking movement from the latest light sensor readings.
 void handleNormalMovement(int& currentHorz, int& currentVert, bool& moveHorz, bool& moveVert, String& horzMsg, String& vertMsg) {
   const auto& val = sensors.getValues();
   int error;
@@ -488,6 +526,7 @@ void handleNormalMovement(int& currentHorz, int& currentVert, bool& moveHorz, bo
   }
 }
 
+// Chooses reset or normal movement, applies servo moves, and updates sleep state.
 void updateLogic() {
   int newHorz = servoHorizontal.getAngle();
   int newVert = servoVertical.getAngle();
@@ -513,6 +552,14 @@ void updateLogic() {
   if (moveHorz || moveVert) {
     doSleep = false;
     powerManager.activateServos();
+
+    long vcc_mV;
+    if (hasLowPowerError(vcc_mV)) {  // Check if there is a power drop after activation of the servos
+      powerManager.deactivateServos();
+      applyLowPowerSleep("low voltage under servo load", vcc_mV);
+      return;
+    }
+
     if (moveHorz) {
       servoHorizontal.write(newHorz);
     }
@@ -526,6 +573,7 @@ void updateLogic() {
 }
 
 
+// Enables slow reset after many long sleeps when the vertical servo is at a limit.
 void checkSlowReset() {
   int currentVert = servoVertical.getAngle();
   if (longSleepCount >= Config::maxLongSleepCount &&
@@ -535,10 +583,32 @@ void checkSlowReset() {
   }
 }
 
+
+// Applies low-power sleep settings and logs the measured voltage.
+void applyLowPowerSleep(const String& reason, long vcc_mV) {
+  doSleep = true;
+  sleepTime = Config::lowPowerSleeptime;  //Very long sleep time to regenerate
+  logger.add("[ERROR] " + reason + ": " + String((int)vcc_mV) + "mV Sleep time: " + String(sleepTime));
+}
+
+// Returns true when live voltage is too low and exposes the measured value.
+bool hasLowPowerError(long& vcc_mV) {
+  vcc_mV = sensors.measureVcc_mV();
+  return (vcc_mV < (long)(Config::minInternalVoltage * 1000));
+}
+
+// Returns true when the measured supply voltage is below the configured minimum.
+bool hasLowPowerError() {
+  long vcc_mV;
+  return hasLowPowerError(vcc_mV);
+}
+
+// Checks sensor and low-power errors and adjusts sleep behavior when needed.
 bool checkErrors() {
   const auto& val = sensors.getValues();
   bool sensorError = (val.down == 1023 && val.up == 1023);
-  bool lowPowerError = (val.vcc_mV < (long)(Config::minInternalVoltage * 1000));
+  long vcc_mV;
+  bool lowPowerError = hasLowPowerError(vcc_mV);
 
   // Slow reset overrules sensor error but not low power
   bool errorState = (sensorError && !slowReset) || lowPowerError;
@@ -551,13 +621,13 @@ bool checkErrors() {
       logger.add("[ERROR] sensors U+D=0");
     }
     if (lowPowerError) {
-      sleepTime = Config::lowPowerSleeptime;  //Very long sleep time to regenerate
-      logger.add("[ERROR] low voltage: " + String((int)val.vcc_mV) + "mV" + "Sleep time: " + sleepTime);
+      applyLowPowerSleep("low voltage", vcc_mV);
     }
   }
   return errorState;
 }
 
+// Runs one control cycle: read sensors, handle errors, move if needed, then sleep or idle.
 void loop() {
   logger.clear();
 
