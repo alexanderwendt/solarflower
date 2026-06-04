@@ -83,6 +83,8 @@ ATmega328P Old bootloader with baud rate 57600
 ### Mosfet IRFZ44N
 <img src="doc/media/irfz44n.jpg" alt="Mosfet IRFZ44N" width="360">
 
+<img src="doc/media/mosfet.jpg" alt="Mosfet wiring" width="360">
+
 In standby mode the sensors shall not consume any energy. Therefore, the ground part of the circuit 
 is turned off with a signal 0 on D4. In case of signal 1, the mosfet lets the current pass to ground. 
 Resistors are crucial with MOSFETs due to the MOSFET's gate capacitance. When switching a MOSFET, this capacitance needs to be charged or discharged. Without a gate resistor, a large current can flow, potentially damaging the driving circuit (e.g., a microcontroller). The resistor limits this current, protecting the driver and controlling the MOSFET's switching speed. This controlled switching is vital for managing electromagnetic interference (EMI) and preventing unwanted oscillations or "ringing" in the circuit.
