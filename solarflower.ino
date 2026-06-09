@@ -58,10 +58,10 @@ namespace Config {
     const uint16_t shortSleepTime = 30;  //time to sleep while short after a movement. 30s to prevent moving all the time as the sun moves
     const uint16_t longSleepTime = 60;
     const int maxLongSleepCount = 60;  //Sleep count before slow reset is activated
-    const int lowPowerSleeptime = 10800; //If low power, the battery must be charged first, sleep 3h
+    const int lowPowerSleeptime = 86400; //If low power, the battery must be charged first, sleep 24h
   #endif
 
-  const float minInternalVoltage = 3.0;  //If the internal voltage drops below 3.0V, the battery is almost empty and there is not enough power to drive the servos
+  const float minInternalVoltage = 4.7;  //If the internal voltage drops below 3.0V, the battery is almost empty and there is not enough power to drive the servos
 }
 
 // ---------------------------------------------------------------------------
@@ -552,6 +552,12 @@ void updateLogic() {
   if (moveHorz || moveVert) {
     doSleep = false;
     powerManager.activateServos();
+    if (moveHorz) {
+      servoHorizontal.write(newHorz);
+    }
+    if (moveVert) {
+      servoVertical.write(newVert);
+    }
 
     long vcc_mV;
     if (hasLowPowerError(vcc_mV)) {  // Check if there is a power drop after activation of the servos
@@ -560,12 +566,6 @@ void updateLogic() {
       return;
     }
 
-    if (moveHorz) {
-      servoHorizontal.write(newHorz);
-    }
-    if (moveVert) {
-      servoVertical.write(newVert);
-    }
   } else {
     doSleep = true;
     powerManager.deactivateServos();

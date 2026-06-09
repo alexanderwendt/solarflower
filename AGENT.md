@@ -36,20 +36,6 @@ The software, written in Arduino C (C++), resides in `solarflower.ino` and focus
 
 **Coding Style:** All code follows the conventions defined in [STYLE.md](STYLE.md).
 
-## Implementation Discussion Numbering
-
-When discussing planned or proposed code changes, use hierarchical numbering so each point can be referenced precisely:
-- Use `1.` for top-level changes.
-- Use `1.1.` for subchanges.
-- Use `1.1.1.` for detailed steps.
-- Use `1.1.1.1.` for the most specific implementation notes.
-
-Keep these identifiers stable while discussing the same implementation plan so follow-up questions can refer to them directly.
-
-## Paragraph Formatting
-
-When inserting a paragraph, always start a new line after the paragraph. Keep paragraph blocks separated by a blank line so later edits and references remain easy to read.
-
 **Key Software Features:**
 - **`setup()` function:** Initializes serial communication, sets up pin modes for sensors and actuators, reads initial sensor values, and sets actuators to initial positions.
 - **`loop()` function:** The main execution loop, which repeatedly reads sensors, checks for error states, reasons about movement, controls actuators, and manages sleep states.
